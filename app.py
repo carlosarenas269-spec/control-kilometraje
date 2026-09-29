@@ -264,9 +264,13 @@ def actualizar_datos_cliente():
     
     if cli and cli in st.session_state.db_clientes:
         sucursales = list(st.session_state.db_clientes[cli].keys())
+        sucursales = [s for s in sucursales if str(s).lower() != 'nan' and str(s).strip() != '']
+        if not sucursales:
+            sucursales = ["Principal"]
+            
         if suc not in sucursales:
+            st.session_state.sel_sucursal_e2 = sucursales[0]
             suc = sucursales[0]
-            st.session_state.sel_sucursal_e2 = suc
         
         info_sucursal = st.session_state.db_clientes[cli].get(suc, {})
         st.session_state.cli_contacto = info_sucursal.get("contacto", "")
@@ -278,6 +282,7 @@ def al_cambiar_cliente_e2():
     cli = str(st.session_state.get("sel_cliente_e2", "")).strip().replace(".0", "")
     if cli and cli in st.session_state.db_clientes:
         sucursales = list(st.session_state.db_clientes[cli].keys())
+        sucursales = [s for s in sucursales if str(s).lower() != 'nan' and str(s).strip() != '']
         if sucursales:
             st.session_state.sel_sucursal_e2 = sucursales[0]
     actualizar_datos_cliente()
@@ -285,7 +290,6 @@ def al_cambiar_cliente_e2():
 
 def al_cambiar_sucursal_e2():
     actualizar_datos_cliente()
-    st.rerun()
 
 # ==========================================
 # CONFIGURACIÓN INICIAL DE LA APP
@@ -523,6 +527,10 @@ if "sel_cliente_e2" not in st.session_state or st.session_state.sel_cliente_e2 n
 
 cli_inicial_limpio = str(st.session_state.sel_cliente_e2).strip().replace(".0", "")
 sucursales_iniciales = list(st.session_state.db_clientes.get(cli_inicial_limpio, {"Principal": {}}).keys())
+sucursales_iniciales = [s for s in sucursales_iniciales if str(s).lower() != 'nan' and str(s).strip() != '']
+if not sucursales_iniciales:
+    sucursales_iniciales = ["Principal"]
+
 if "sel_sucursal_e2" not in st.session_state or st.session_state.sel_sucursal_e2 not in sucursales_iniciales:
     st.session_state.sel_sucursal_e2 = sucursales_iniciales[0]
 
@@ -633,7 +641,7 @@ if es_admin:
                 st.rerun()
 
     with tab_admin3:
-        st.subheader("🗑️ Eliminar Elementos de Catálogos")
+        st.subheader("🗑️️ Eliminar Elementos de Catálogos")
         col_e1, col_e2, col_e3 = st.columns(3)
         with col_e1:
             uni_a_borrar = st.selectbox("Unidad a eliminar:", options=st.session_state.lista_unidades)
@@ -782,10 +790,24 @@ elif st.session_state.etapa_idx == 2:
     with col1:
         cli_sel = st.selectbox("Número de Cliente:", options=st.session_state.lista_clientes, key="sel_cliente_e2", on_change=al_cambiar_cliente_e2)
         cli_limpio = str(cli_sel).strip().replace(".0", "")
-        sucursales_cliente = list(st.session_state.db_clientes.get(cli_limpio, {"Principal": {}}).keys())
         
-        suc_sel = st.selectbox("Sucursal / Razón Social:", options=sucursales_cliente, key="sel_sucursal_e2", on_change=al_cambiar_sucursal_e2)
-        st.session_state.sel_sucursal_e2 = suc_sel
+        sucursales_cliente = list(st.session_state.db_clientes.get(cli_limpio, {"Principal": {}}).keys())
+        sucursales_cliente = [s for s in sucursales_cliente if str(s).lower() != 'nan' and str(s).strip() != '']
+        if not sucursales_cliente:
+            sucursales_cliente = ["Principal"]
+        
+        idx_suc_actual = 0
+        current_suc = st.session_state.get("sel_sucursal_e2")
+        if current_suc in sucursales_cliente:
+            idx_suc_actual = sucursales_cliente.index(current_suc)
+
+        suc_sel = st.selectbox(
+            "Sucursal / Razón Social:", 
+            options=sucursales_cliente, 
+            index=idx_suc_actual,
+            key="sel_sucursal_e2", 
+            on_change=al_cambiar_sucursal_e2
+        )
         
         actualizar_datos_cliente()
 
@@ -875,7 +897,6 @@ elif st.session_state.etapa_idx == 3:
             guardar_en_excel(registro_final, ARCHIVO_REGISTROS)
             st.session_state.ruta_guardada = True
             
-            # Limpiar borrador o reiniciar etapas para el siguiente viaje
             if os.path.exists(ARCHIVO_BORRADOR):
                 try: os.remove(ARCHIVO_BORRADOR)
                 except: pass
