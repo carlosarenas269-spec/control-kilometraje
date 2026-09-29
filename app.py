@@ -320,7 +320,7 @@ if es_admin:
             st.rerun()
 
     st.sidebar.markdown("---")
-    st.sidebar.subheader("🖼️ Imagen de Portada")
+    st.sidebar.subheader("🖼️️ Imagen de Portada")
     foto_portada_subida = st.sidebar.file_uploader("Sube nueva portada:", type=["jpg", "jpeg", "png"], key="up_portada_admin")
     if foto_portada_subida is not None and st.sidebar.button("💾 Guardar Nueva Portada"):
         try:
@@ -792,9 +792,19 @@ elif st.session_state.etapa_idx == 2:
         st.markdown("##### 🚀 Salida de Cliente (Descargado)")
         st.number_input("Km Salida Cliente:", value=float(st.session_state.km_salida_cliente), step=1.0, key="km_salida_cliente")
         if st.button("⏰ Registrar Hora Salida Cliente"):
-            st.session_state.hora_cierre_cliente = obtener_hora_mexico() # Se mantiene consistencia
+            st.session_state.hora_cierre_cliente = obtener_hora_mexico()
             guardar_borrador_de_disco()
             st.success("Salida de cliente registrada.")
+
+    # 🗺️ MAPA DE GOOGLE MAPS RESTAURADO
+    st.markdown("---")
+    st.markdown("##### 🗺️ Ubicación del Cliente en el Mapa")
+    df_mapa = pd.DataFrame({
+        'lat': [st.session_state.cli_latitud],
+        'lon': [st.session_state.cli_longitud]
+    })
+    st.map(df_mapa, zoom=14, use_container_width=True)
+    st.caption(f"Coordenadas actuales: Lat: {st.session_state.cli_latitud}, Lon: {st.session_state.cli_longitud}")
 
     col_ant, col_sig = st.columns(2)
     with col_ant:
