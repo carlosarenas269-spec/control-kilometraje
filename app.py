@@ -199,17 +199,28 @@ def guardar_catalogos_en_disco():
             for num_cli, sucursales in st.session_state.db_clientes.items():
                 for suc_nombre, info in sucursales.items():
                     clientes_data.append({
-                        "num_cliente": str(num_cli), "nombre": str(suc_nombre),
-                        "contacto": str(info.get("contacto", "")), "telefono": str(info.get("telefono", "")),
-                        "latitud": float(info.get("latitud", 25.844412)), "longitud": float(info.get("longitud", -100.293652))
+                        "num_cliente": str(num_cli), 
+                        "nombre": str(suc_nombre),
+                        "contacto": str(info.get("contacto", "")), 
+                        "telefono": str(info.get("telefono", "")),
+                        "latitud": float(info.get("latitud", 25.844412)), 
+                        "longitud": float(info.get("longitud", -100.293652))
                     })
             pd.DataFrame(clientes_data).to_excel(writer, sheet_name="Clientes", index=False)
         
-        # Sincronizar con Supabase usando la API oficial
+        # Sincronizar con Supabase registro por registro
         supabase = init_supabase()
         if supabase and clientes_data:
-            supabase.table("clientes_fletes").delete().neq("id", 0).execute()
-            supabase.table("clientes_fletes").insert(clientes_data).execute()
+            print("Iniciando sincronización con Supabase...")
+            try:
+                supabase.table("clientes_fletes").delete().neq("num_cliente", "NO_EXISTE_XYZ").execute()
+            except Exception as ex:
+                print(f"Aviso al limpiar tabla Supabase: {ex}")
+            
+            for item in clientes_data:
+                res = supabase.table("clientes_fletes").insert(item).execute()
+                print(f"Resultado inserción cliente {item['num_cliente']}: {res}")
+            print("¡Sincronización con Supabase finalizada!")
     except Exception as e:
         print(f"Error al guardar catálogos: {e}")
 
@@ -1025,7 +1036,7 @@ elif st.session_state.etapa_idx == 2:
             st.session_state.etapa_idx = 1
             st.rerun()
     with col_nc2:
-        if st.button("➡️ Avanzar a Cierre de Ruta"):
+        if st.button("➡ Avanzar a Cierre de Ruta"):
             st.session_state.etapa_idx = 3
             guardar_borrador_de_disco()
             st.rerun()
