@@ -258,8 +258,22 @@ def al_cambiar_unidad():
         st.session_state.operador_activo = op_asignado
     guardar_borrador_de_disco()
 
+def limpiar_id_cliente(val):
+    if not val:
+        return ""
+    val_str = str(val).strip().replace(".0", "")
+    # Extraer la primera parte antes de un guión o espacio si viene compuesto (ej: "3185 - 3185" -> "3185")
+    match = re.match(r'^([A-Za-z0-9_-]+)', val_str)
+    if match:
+        token = match.group(1)
+        if "-" in token:
+            token = token.split("-")[0]
+        return token.strip()
+    return val_str.split()[0]
+
 def actualizar_datos_cliente():
-    cli = str(st.session_state.get("sel_cliente_e2", "")).strip().replace(".0", "")
+    raw_cli = str(st.session_state.get("sel_cliente_e2", ""))
+    cli = limpiar_id_cliente(raw_cli)
     suc = st.session_state.get("sel_sucursal_e2", "")
     
     if cli and cli in st.session_state.db_clientes:
@@ -288,9 +302,15 @@ def actualizar_datos_cliente():
         st.session_state.cli_telefono = info_sucursal.get("telefono", "")
         st.session_state.cli_latitud = float(lat_val if lat_val is not None else 25.844412)
         st.session_state.cli_longitud = float(lon_val if lon_val is not None else -100.395043)
+    else:
+        st.session_state.cli_contacto = ""
+        st.session_state.cli_telefono = ""
+        st.session_state.cli_latitud = 25.844412
+        st.session_state.cli_longitud = -100.395043
 
 def al_cambiar_cliente_e2():
-    cli = str(st.session_state.get("sel_cliente_e2", "")).strip().replace(".0", "")
+    raw_cli = str(st.session_state.get("sel_cliente_e2", ""))
+    cli = limpiar_id_cliente(raw_cli)
     if cli and cli in st.session_state.db_clientes:
         sucursales = list(st.session_state.db_clientes[cli].keys())
         sucursales = [s for s in sucursales if str(s).lower() != 'nan' and str(s).strip() != '']
@@ -537,7 +557,7 @@ for var, val in [
 if "sel_cliente_e2" not in st.session_state or st.session_state.sel_cliente_e2 not in st.session_state.lista_clientes:
     st.session_state.sel_cliente_e2 = st.session_state.lista_clientes[0]
 
-cli_inicial_limpio = str(st.session_state.sel_cliente_e2).strip().replace(".0", "")
+cli_inicial_limpio = limpiar_id_cliente(st.session_state.sel_cliente_e2)
 sucursales_iniciales = list(st.session_state.db_clientes.get(cli_inicial_limpio, {"Principal": {}}).keys())
 sucursales_iniciales = [s for s in sucursales_iniciales if str(s).lower() != 'nan' and str(s).strip() != '']
 if not sucursales_iniciales:
@@ -842,7 +862,7 @@ elif st.session_state.etapa_idx == 2:
                                index=st.session_state.lista_clientes.index(st.session_state.sel_cliente_e2) if st.session_state.sel_cliente_e2 in st.session_state.lista_clientes else 0,
                                key="sel_cliente_e2", on_change=al_cambiar_cliente_e2)
     
-    cli_limpio = str(st.session_state.sel_cliente_e2).strip().replace(".0", "")
+    cli_limpio = limpiar_id_cliente(st.session_state.sel_cliente_e2)
     sucursales_disp = list(st.session_state.db_clientes.get(cli_limpio, {"Principal": {}}).keys())
     sucursales_disp = [s for s in sucursales_disp if str(s).lower() != 'nan' and str(s).strip() != '']
     if not sucursales_disp: sucursales_disp = ["Principal"]
@@ -957,6 +977,6 @@ elif st.session_state.etapa_idx == 3:
         guardar_borrador_de_disco()
         st.rerun()
 
-    if st.button("⬅️ Volver a Etapa Cliente"):
+    if st.button("⬅️️ Volver a Etapa Cliente"):
         st.session_state.etapa_idx = 2
         st.rerun()
