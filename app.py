@@ -202,29 +202,18 @@ def guardar_catalogos_en_disco():
             for num_cli, sucursales in st.session_state.db_clientes.items():
                 for suc_nombre, info in sucursales.items():
                     clientes_data.append({
-                        "num_cliente": num_cli, "nombre": suc_nombre,
-                        "contacto": info.get("contacto", ""), "telefono": info.get("telefono", ""),
-                        "latitud": info.get("latitud", 25.844412), "longitud": info.get("longitud", -100.293652)
+                        "num_cliente": str(num_cli), "nombre": str(suc_nombre),
+                        "contacto": str(info.get("contacto", "")), "telefono": str(info.get("telefono", "")),
+                        "latitud": float(info.get("latitud", 25.844412)), "longitud": float(info.get("longitud", -100.293652))
                     })
             pd.DataFrame(clientes_data).to_excel(writer, sheet_name="Clientes", index=False)
         
-        # Sincronizar también con Supabase si está disponible para persistencia total
+        # Sincronizar con Supabase (PostgreSQL)
         engine = obtener_motor_db()
-        if engine:
-            clientes_plano = []
-            for num_cli, sucursales in st.session_state.db_clientes.items():
-                for suc_nombre, info in sucursales.items():
-                    clientes_plano.append({
-                        "num_cliente": str(num_cli),
-                        "nombre": str(suc_nombre),
-                        "contacto": str(info.get("contacto", "")),
-                        "telefono": str(info.get("telefono", "")),
-                        "latitud": float(info.get("latitud", 25.844412)),
-                        "longitud": float(info.get("longitud", -100.293652))
-                    })
-            if clientes_plano:
-                df_supabase = pd.DataFrame(clientes_plano)
-                df_supabase.to_sql("clientes_fletes", con=engine, if_exists="replace", index=False)
+        if engine and clientes_data:
+            df_supabase = pd.DataFrame(clientes_data)
+            with engine.begin() as conn:
+                df_supabase.to_sql("clientes_fletes", con=conn, if_exists="replace", index=False)
     except Exception as e:
         print(f"Error al guardar catálogos: {e}")
 
@@ -317,6 +306,9 @@ def cargar_catalogos_de_disco():
                         st.session_state.db_clientes = nueva_db
         except Exception as e:
             print(f"Error al leer catálogos locales: {e}")
+
+    if not cargado_desde_db:
+        guardar_catalogos_en_disco()
 
 # ==========================================
 # CALLBACKS DE SINCRONIZACIÓN REACTIVA
@@ -877,7 +869,7 @@ if es_admin:
                     st.success(f"✅ Clientes eliminados correctamente: {', '.join(cli_a_borrar)}")
                     st.rerun()
                 else:
-                    st.warning("⚠️️ No has seleccionado ningún cliente para eliminar.")
+                    st.warning("⚠️ No has seleccionado ningún cliente para eliminar.")
 
     with tab_admin4:
         st.subheader("📊 Historial General de Registros")
@@ -1036,7 +1028,7 @@ elif st.session_state.etapa_idx == 2:
             st.session_state.etapa_idx = 1
             st.rerun()
     with col_nc2:
-        if st.button("➡️ Avanzar a Cierre de Ruta"):
+        if st.button("➡️️ Avanzar a Cierre de Ruta"):
             st.session_state.etapa_idx = 3
             guardar_borrador_de_disco()
             st.rerun()
@@ -1098,6 +1090,6 @@ elif st.session_state.etapa_idx == 3:
         guardar_borrador_de_disco()
         st.rerun()
 
-    if st.button("⬅️ Volver a Etapa Cliente"):
+    if st.button("⬅️️ Volver a Etapa Cliente"):
         st.session_state.etapa_idx = 2
         st.rerun()
