@@ -6,9 +6,10 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 from PIL import Image
+from sqlalchemy import create_engine
 
 # ==========================================
-# CONFIGURACIÓN Y PERSISTENCIA DE DATOS
+# CONFIGURACIÓN Y PERSISTENCIA DE SUPABASE Y DATOS
 # ==========================================
 ARCHIVO_REGISTROS = "registros_rutas.xlsx"
 ARCHIVO_CATALOGOS = "catalogos_guardados.xlsx"
@@ -22,6 +23,20 @@ CARPETA_FOTOS_OPERADORES = "Fotos_Operadores"
 os.makedirs(CARPETA_BANNER, exist_ok=True)
 os.makedirs(CARPETA_LOGO, exist_ok=True)
 os.makedirs(CARPETA_FOTOS_OPERADORES, exist_ok=True)
+
+@st.cache_resource
+def obtener_motor_db():
+    try:
+        if "DATABASE_URL" in st.secrets:
+            db_url = st.secrets["DATABASE_URL"]
+            if db_url.startswith("postgres://"):
+                db_url = db_url.replace("postgres://", "postgresql+psycopg2://", 1)
+            elif db_url.startswith("postgresql://") and "+psycopg2" not in db_url:
+                db_url = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+            return create_engine(db_url)
+    except Exception:
+        pass
+    return None
 
 def cargar_configuracion():
     config_default = {
@@ -177,6 +192,7 @@ def cargar_borrador_de_disco():
 
 def guardar_catalogos_en_disco():
     try:
+        # Guardar localmente
         with pd.ExcelWriter(ARCHIVO_CATALOGOS, engine='openpyxl') as writer:
             pd.DataFrame({"Unidades": st.session_state.lista_unidades}).to_excel(writer, sheet_name="Unidades", index=False)
             pd.DataFrame({"Operadores": st.session_state.lista_operadores}).to_excel(writer, sheet_name="Operadores", index=False)
@@ -191,11 +207,66 @@ def guardar_catalogos_en_disco():
                         "latitud": info.get("latitud", 25.844412), "longitud": info.get("longitud", -100.293652)
                     })
             pd.DataFrame(clientes_data).to_excel(writer, sheet_name="Clientes", index=False)
+        
+        # Sincronizar también con Supabase si está disponible para persistencia total
+        engine = obtener_motor_db()
+        if engine:
+            clientes_plano = []
+            for num_cli, sucursales in st.session_state.db_clientes.items():
+                for suc_nombre, info in sucursales.items():
+                    clientes_plano.append({
+                        "num_cliente": str(num_cli),
+                        "nombre": str(suc_nombre),
+                        "contacto": str(info.get("contacto", "")),
+                        "telefono": str(info.get("telefono", "")),
+                        "latitud": float(info.get("latitud", 25.844412)),
+                        "longitud": float(info.get("longitud", -100.293652))
+                    })
+            if clientes_plano:
+                df_supabase = pd.DataFrame(clientes_plano)
+                df_supabase.to_sql("clientes_fletes", con=engine, if_exists="replace", index=False)
     except Exception as e:
         print(f"Error al guardar catálogos: {e}")
 
 def cargar_catalogos_de_disco():
-    if os.path.exists(ARCHIVO_CATALOGOS):
+    cargado_desde_db = False
+    engine = obtener_motor_db()
+    if engine:
+        try:
+            df_c = pd.read_sql("SELECT * FROM clientes_fletes", con=engine)
+            if not df_c.empty:
+                nueva_db = {}
+                lista_c = []
+                for _, row in df_c.iterrows():
+                    num_cli = str(row.get("num_cliente", "")).strip().replace(".0", "")
+                    suc_nombre = str(row.get("nombre", "Principal"))
+                    if num_cli and num_cli.lower() != 'nan':
+                        if num_cli not in lista_c: lista_c.append(num_cli)
+                        if num_cli not in nueva_db: nueva_db[num_cli] = {}
+                        try: lat_val = float(row.get("latitud", 25.844412))
+                        except: lat_val = 25.844412
+                        try: lon_val = float(row.get("longitud", -100.395043))
+                        except: lon_val = -100.395043
+                        
+                        contacto_val = str(row.get("contacto", ""))
+                        if contacto_val.lower() == 'nan': contacto_val = ""
+                        telefono_val = str(row.get("telefono", ""))
+                        if telefono_val.lower() == 'nan': telefono_val = ""
+
+                        nueva_db[num_cli][suc_nombre] = {
+                            "contacto": contacto_val,
+                            "telefono": telefono_val,
+                            "latitud": lat_val,
+                            "longitud": asegurar_longitud_negativa(lon_val)
+                        }
+                if lista_c:
+                    st.session_state.lista_clientes = lista_c
+                    st.session_state.db_clientes = nueva_db
+                    cargado_desde_db = True
+        except Exception as e:
+            print(f"No se pudo cargar desde Supabase, intentando respaldo local: {e}")
+
+    if not cargado_desde_db and os.path.exists(ARCHIVO_CATALOGOS):
         try:
             xl = pd.ExcelFile(ARCHIVO_CATALOGOS)
             if "Unidades" in xl.sheet_names:
@@ -245,7 +316,7 @@ def cargar_catalogos_de_disco():
                         st.session_state.lista_clientes = lista_c
                         st.session_state.db_clientes = nueva_db
         except Exception as e:
-            print(f"Error al leer catálogos: {e}")
+            print(f"Error al leer catálogos locales: {e}")
 
 # ==========================================
 # CALLBACKS DE SINCRONIZACIÓN REACTIVA
@@ -262,7 +333,6 @@ def limpiar_id_cliente(val):
     if not val:
         return ""
     val_str = str(val).strip().replace(".0", "")
-    # Extraer la primera parte antes de un guión o espacio si viene compuesto (ej: "3185 - 3185" -> "3185")
     match = re.match(r'^([A-Za-z0-9_-]+)', val_str)
     if match:
         token = match.group(1)
@@ -528,10 +598,7 @@ if "lista_clientes" not in st.session_state: st.session_state.lista_clientes = l
 if "db_clientes" not in st.session_state: st.session_state.db_clientes = dict(DB_CLIENTES_DEFAULT)
 
 if "catalogos_cargados" not in st.session_state:
-    if os.path.exists(ARCHIVO_CATALOGOS):
-        cargar_catalogos_de_disco()
-    else:
-        guardar_catalogos_en_disco()
+    cargar_catalogos_de_disco()
     cargar_borrador_de_disco()
     st.session_state.catalogos_cargados = True
 
@@ -582,7 +649,7 @@ if es_admin:
     ])
     
     with tab_admin1:
-        sub_modo = st.radio("Método de Ingreso:", ["Registro Manual Individual", "📂 Subida Masiva (Excel / CSV)"], horizontal=True)
+        sub_modo = st.radio("Método de Ingreso:", ["Registro Manual Individual", "✏️ Editar Base de Clientes Actual", "📂 Subida Masiva (Excel / CSV)"], horizontal=True)
         tipo_gestion = st.selectbox("¿Qué deseas gestionar?", ["Unidad", "Operador", "Cliente y Sucursal"])
         
         if sub_modo == "Registro Manual Individual":
@@ -619,11 +686,67 @@ if es_admin:
                         guardar_catalogos_en_disco()
                         st.success("✅ Cliente/Sucursal guardado con éxito.")
                         st.rerun()
+        
+        elif sub_modo == "✏️ Editar Base de Clientes Actual":
+            if tipo_gestion == "Cliente y Sucursal":
+                st.subheader("✏️ Edición Interactiva de Clientes y Sucursales Existentes")
+                st.info("Modifica directamente los datos, contactos, teléfonos o coordenadas abajo y haz clic en guardar cambios.")
+                
+                clientes_plano = []
+                for num_cli, sucursales in st.session_state.db_clientes.items():
+                    for suc_nombre, info in sucursales.items():
+                        clientes_plano.append({
+                            "num_cliente": str(num_cli),
+                            "nombre": str(suc_nombre),
+                            "contacto": str(info.get("contacto", "")),
+                            "telefono": str(info.get("telefono", "")),
+                            "latitud": float(info.get("latitud", 25.844412)),
+                            "longitud": float(info.get("longitud", -100.293652))
+                        })
+                
+                df_clientes_editable = pd.DataFrame(clientes_plano)
+                df_editado = st.data_editor(df_clientes_editable, num_rows="dynamic", use_container_width=True, key="editor_tabla_clientes")
+                
+                if st.button("💾 Guardar Cambios en la Base de Clientes"):
+                    try:
+                        nueva_db = {}
+                        nueva_lista_c = []
+                        for _, row in df_editado.iterrows():
+                            n_cli = str(row.get("num_cliente", "")).strip().replace(".0", "")
+                            n_suc = str(row.get("nombre", "Principal")).strip()
+                            if n_cli and n_cli.lower() != 'nan':
+                                if n_cli not in nueva_lista_c:
+                                    nueva_lista_c.append(n_cli)
+                                if n_cli not in nueva_db:
+                                    nueva_db[n_cli] = {}
+                                nueva_db[n_cli][n_suc] = {
+                                    "contacto": str(row.get("contacto", "")),
+                                    "telefono": str(row.get("telefono", "")),
+                                    "latitud": float(row.get("latitud", 25.844412)),
+                                    "longitud": asegurar_longitud_negativa(float(row.get("longitud", -100.293652)))
+                                }
+                        st.session_state.db_clientes = nueva_db
+                        st.session_state.lista_clientes = nueva_lista_c
+                        guardar_catalogos_en_disco()
+                        st.success("✅ ¡Base de clientes actualizada y guardada con éxito de forma persistente!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al guardar los cambios: {e}")
+            else:
+                st.warning("⚠️ La edición directa en tabla está disponible seleccionando 'Cliente y Sucursal'.")
+
         else:
             archivo_subido_masivo = st.file_uploader(f"Selecciona archivo para {tipo_gestion}(s):", type=["xlsx", "xls", "csv"])
             if archivo_subido_masivo is not None:
                 try:
-                    df_masivo = pd.read_csv(archivo_subido_masivo) if archivo_subido_masivo.name.endswith(".csv") else pd.read_excel(archivo_subido_masivo)
+                    if archivo_subido_masivo.name.endswith(".csv"):
+                        df_masivo = pd.read_csv(archivo_subido_masivo)
+                    else:
+                        try:
+                            df_masivo = pd.read_excel(archivo_subido_masivo, engine="openpyxl")
+                        except Exception:
+                            df_masivo = pd.read_excel(archivo_subido_masivo)
+                            
                     st.dataframe(df_masivo.head())
                     if st.button("🚀 Procesar e Importar"):
                         contador_exito = 0
@@ -754,7 +877,7 @@ if es_admin:
                     st.success(f"✅ Clientes eliminados correctamente: {', '.join(cli_a_borrar)}")
                     st.rerun()
                 else:
-                    st.warning("⚠️ No has seleccionado ningún cliente para eliminar.")
+                    st.warning("⚠️️ No has seleccionado ningún cliente para eliminar.")
 
     with tab_admin4:
         st.subheader("📊 Historial General de Registros")
@@ -785,7 +908,6 @@ if st.session_state.etapa_idx == 0:
         st.session_state.operador_activo = st.selectbox("Operador Asignado:", options=st.session_state.lista_operadores,
                                                         index=st.session_state.lista_operadores.index(op_sugerido))
 
-    # Mostrar foto del operador si existe
     nombre_op_limpio = "".join([c if c.isalnum() else "_" for c in st.session_state.operador_activo])
     tamano_f = config_actual.get("tamano_foto_operador", 120)
     foto_encontrada = None
@@ -872,7 +994,6 @@ elif st.session_state.etapa_idx == 2:
                                index=sucursales_disp.index(st.session_state.sel_sucursal_e2) if st.session_state.sel_sucursal_e2 in sucursales_disp else 0,
                                key="sel_sucursal_e2", on_change=al_cambiar_sucursal_e2)
 
-    # Forzamos la actualización de coordenadas y datos antes de pintarlos en pantalla
     actualizar_datos_cliente()
 
     st.markdown(f"""
@@ -977,6 +1098,6 @@ elif st.session_state.etapa_idx == 3:
         guardar_borrador_de_disco()
         st.rerun()
 
-    if st.button("⬅️️ Volver a Etapa Cliente"):
+    if st.button("⬅️ Volver a Etapa Cliente"):
         st.session_state.etapa_idx = 2
         st.rerun()
