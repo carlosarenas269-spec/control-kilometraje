@@ -273,10 +273,21 @@ def actualizar_datos_cliente():
             suc = sucursales[0]
         
         info_sucursal = st.session_state.db_clientes[cli].get(suc, {})
+        
+        lat_val = info_sucursal.get("latitud")
+        lon_val = info_sucursal.get("longitud")
+        
+        if lat_val is None or float(lat_val) == 25.844412:
+            for otra_suc, otra_info in st.session_state.db_clientes[cli].items():
+                if otra_info.get("latitud") and float(otra_info.get("latitud")) != 25.844412:
+                    lat_val = otra_info.get("latitud")
+                    lon_val = otra_info.get("longitud")
+                    break
+
         st.session_state.cli_contacto = info_sucursal.get("contacto", "")
         st.session_state.cli_telefono = info_sucursal.get("telefono", "")
-        st.session_state.cli_latitud = float(info_sucursal.get("latitud", 25.844412))
-        st.session_state.cli_longitud = float(info_sucursal.get("longitud", -100.395043))
+        st.session_state.cli_latitud = float(lat_val if lat_val is not None else 25.844412)
+        st.session_state.cli_longitud = float(lon_val if lon_val is not None else -100.395043)
 
 def al_cambiar_cliente_e2():
     cli = str(st.session_state.get("sel_cliente_e2", "")).strip().replace(".0", "")
@@ -349,7 +360,7 @@ if es_admin:
         st.rerun()
 
     st.sidebar.markdown("---")
-    st.sidebar.subheader("🛡️️ Logotipo de la Barra")
+    st.sidebar.subheader("🛡️ Logotipo de la Barra")
     logo_subido = st.sidebar.file_uploader("Sube logotipo:", type=["jpg", "jpeg", "png"], key="up_logo_admin")
     if logo_subido is not None and st.sidebar.button("💾 Guardar Logotipo"):
         try:
@@ -841,7 +852,7 @@ elif st.session_state.etapa_idx == 2:
                                index=sucursales_disp.index(st.session_state.sel_sucursal_e2) if st.session_state.sel_sucursal_e2 in sucursales_disp else 0,
                                key="sel_sucursal_e2", on_change=al_cambiar_sucursal_e2)
 
-    # Actualizamos los valores dinámicamente antes de mostrarlos
+    # Forzamos la actualización de coordenadas y datos antes de pintarlos en pantalla
     actualizar_datos_cliente()
 
     st.markdown(f"""
