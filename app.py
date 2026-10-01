@@ -262,6 +262,7 @@ def limpiar_id_cliente(val):
     if not val:
         return ""
     val_str = str(val).strip().replace(".0", "")
+    # Extraer la primera parte antes de un guión o espacio si viene compuesto (ej: "3185 - 3185" -> "3185")
     match = re.match(r'^([A-Za-z0-9_-]+)', val_str)
     if match:
         token = match.group(1)
@@ -581,7 +582,7 @@ if es_admin:
     ])
     
     with tab_admin1:
-        sub_modo = st.radio("Método de Ingreso:", ["Registro Manual Individual", "✏️ Editar Base de Clientes Actual", "📂 Subida Masiva (Excel / CSV)"], horizontal=True)
+        sub_modo = st.radio("Método de Ingreso:", ["Registro Manual Individual", "📂 Subida Masiva (Excel / CSV)"], horizontal=True)
         tipo_gestion = st.selectbox("¿Qué deseas gestionar?", ["Unidad", "Operador", "Cliente y Sucursal"])
         
         if sub_modo == "Registro Manual Individual":
@@ -618,58 +619,6 @@ if es_admin:
                         guardar_catalogos_en_disco()
                         st.success("✅ Cliente/Sucursal guardado con éxito.")
                         st.rerun()
-        
-        elif sub_modo == "✏️ Editar Base de Clientes Actual":
-            if tipo_gestion == "Cliente y Sucursal":
-                st.subheader("✏️ Edición Interactiva de Clientes y Sucursales Existentes")
-                st.info("Modifica directamente los datos, contactos, teléfonos o coordenadas abajo y haz clic en guardar cambios.")
-                
-                # Construir DataFrame plano con todos los clientes actuales de la base
-                clientes_plano = []
-                for num_cli, sucursales in st.session_state.db_clientes.items():
-                    for suc_nombre, info in sucursales.items():
-                        clientes_plano.append({
-                            "num_cliente": str(num_cli),
-                            "nombre": str(suc_nombre),
-                            "contacto": str(info.get("contacto", "")),
-                            "telefono": str(info.get("telefono", "")),
-                            "latitud": float(info.get("latitud", 25.844412)),
-                            "longitud": float(info.get("longitud", -100.293652))
-                        })
-                
-                df_clientes_editable = pd.DataFrame(clientes_plano)
-                
-                # Editor interactivo de Streamlit
-                df_editado = st.data_editor(df_clientes_editable, num_rows="dynamic", use_container_width=True, key="editor_tabla_clientes")
-                
-                if st.button("💾 Guardar Cambios en la Base de Clientes"):
-                    try:
-                        nueva_db = {}
-                        nueva_lista_c = []
-                        for _, row in df_editado.iterrows():
-                            n_cli = str(row.get("num_cliente", "")).strip().replace(".0", "")
-                            n_suc = str(row.get("nombre", "Principal")).strip()
-                            if n_cli and n_cli.lower() != 'nan':
-                                if n_cli not in nueva_lista_c:
-                                    nueva_lista_c.append(n_cli)
-                                if n_cli not in nueva_db:
-                                    nueva_db[n_cli] = {}
-                                nueva_db[n_cli][n_suc] = {
-                                    "contacto": str(row.get("contacto", "")),
-                                    "telefono": str(row.get("telefono", "")),
-                                    "latitud": float(row.get("latitud", 25.844412)),
-                                    "longitud": asegurar_longitud_negativa(float(row.get("longitud", -100.293652)))
-                                }
-                        st.session_state.db_clientes = nueva_db
-                        st.session_state.lista_clientes = nueva_lista_c
-                        guardar_catalogos_en_disco()
-                        st.success("✅ ¡Base de clientes actualizada y guardada con éxito!")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error al guardar los cambios: {e}")
-            else:
-                st.warning("⚠️ La edición directa en tabla está disponible seleccionando 'Cliente y Sucursal'.")
-
         else:
             archivo_subido_masivo = st.file_uploader(f"Selecciona archivo para {tipo_gestion}(s):", type=["xlsx", "xls", "csv"])
             if archivo_subido_masivo is not None:
@@ -728,7 +677,7 @@ if es_admin:
         st.dataframe(df_asig_view, use_container_width=True)
 
     with tab_admin3:
-        st.subheader("🗑️️ Eliminar Elementos de Catálogos con Selección Múltiple")
+        st.subheader("🗑️ Eliminar Elementos de Catálogos con Selección Múltiple")
         tipo_del = st.selectbox("Selecciona catálogo a modificar:", ["Unidad", "Operador", "Cliente completo"])
         
         if tipo_del == "Unidad":
@@ -780,7 +729,7 @@ if es_admin:
                     st.success(f"✅ Operadores eliminados correctamente: {', '.join(ops_a_borrar)}")
                     st.rerun()
                 else:
-                    st.warning("⚠️️ No has seleccionado ningún operador para eliminar.")
+                    st.warning("⚠️ No has seleccionado ningún operador para eliminar.")
 
         elif tipo_del == "Cliente completo":
             df_cli_chk = pd.DataFrame({"Cliente ID": st.session_state.lista_clientes})
@@ -1028,6 +977,6 @@ elif st.session_state.etapa_idx == 3:
         guardar_borrador_de_disco()
         st.rerun()
 
-    if st.button("⬅️ Volver a Etapa Cliente"):
+    if st.button("⬅️️ Volver a Etapa Cliente"):
         st.session_state.etapa_idx = 2
         st.rerun()
