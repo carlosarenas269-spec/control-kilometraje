@@ -290,6 +290,7 @@ def al_cambiar_cliente_e2():
 
 def al_cambiar_sucursal_e2():
     actualizar_datos_cliente()
+    st.rerun()
 
 # ==========================================
 # CONFIGURACIÓN INICIAL DE LA APP
@@ -348,7 +349,7 @@ if es_admin:
         st.rerun()
 
     st.sidebar.markdown("---")
-    st.sidebar.subheader("🛡️ Logotipo de la Barra")
+    st.sidebar.subheader("🛡️️ Logotipo de la Barra")
     logo_subido = st.sidebar.file_uploader("Sube logotipo:", type=["jpg", "jpeg", "png"], key="up_logo_admin")
     if logo_subido is not None and st.sidebar.button("💾 Guardar Logotipo"):
         try:
@@ -645,36 +646,84 @@ if es_admin:
         st.dataframe(df_asig_view, use_container_width=True)
 
     with tab_admin3:
-        st.subheader("🗑️ Eliminar Elementos de Catálogos")
+        st.subheader("🗑️ Eliminar Elementos de Catálogos con Selección Múltiple")
         tipo_del = st.selectbox("Selecciona catálogo a modificar:", ["Unidad", "Operador", "Cliente completo"])
+        
         if tipo_del == "Unidad":
-            uni_del = st.selectbox("Unidad a eliminar:", options=st.session_state.lista_unidades)
-            if st.button("🗑️ Eliminar Unidad"):
-                if uni_del in st.session_state.lista_unidades:
-                    st.session_state.lista_unidades.remove(uni_del)
-                    if uni_del in st.session_state.asig_unidad_operador:
-                        del st.session_state.asig_unidad_operador[uni_del]
+            if "sel_unidades_borrar" not in st.session_state:
+                st.session_state.sel_unidades_borrar = []
+            
+            df_unidades_chk = pd.DataFrame({"Unidad": st.session_state.lista_unidades})
+            df_unidades_chk.insert(0, "Seleccionar", False)
+            
+            edited_unidades = st.data_editor(
+                df_unidades_chk,
+                column_config={"Seleccionar": st.column_config.CheckboxColumn(required=True)},
+                hide_index=True,
+                key="editor_unidades_del"
+            )
+            
+            if st.button("🗑️ Eliminar Unidades Seleccionadas"):
+                unidades_a_borrar = edited_unidades[edited_unidades["Seleccionar"]]["Unidad"].tolist()
+                if unidades_a_borrar:
+                    for u in unidades_a_borrar:
+                        if u in st.session_state.lista_unidades:
+                            st.session_state.lista_unidades.remove(u)
+                        if u in st.session_state.asig_unidad_operador:
+                            del st.session_state.asig_unidad_operador[u]
                     guardar_catalogos_en_disco()
-                    st.success(f"Unidad {uni_del} eliminada.")
+                    st.success(f"✅ Unidades eliminadas correctamente: {', '.join(unidades_a_borrar)}")
                     st.rerun()
+                else:
+                    st.warning("⚠️ No has seleccionado ninguna unidad para eliminar.")
+
         elif tipo_del == "Operador":
-            op_del = st.selectbox("Operador a eliminar:", options=st.session_state.lista_operadores)
-            if st.button("🗑️ Eliminar Operador"):
-                if op_del in st.session_state.lista_operadores:
-                    st.session_state.lista_operadores.remove(op_del)
+            df_ops_chk = pd.DataFrame({"Operador": st.session_state.lista_operadores})
+            df_ops_chk.insert(0, "Seleccionar", False)
+            
+            edited_ops = st.data_editor(
+                df_ops_chk,
+                column_config={"Seleccionar": st.column_config.CheckboxColumn(required=True)},
+                hide_index=True,
+                key="editor_ops_del"
+            )
+            
+            if st.button("🗑️ Eliminar Operadores Seleccionados"):
+                ops_a_borrar = edited_ops[edited_ops["Seleccionar"]]["Operador"].tolist()
+                if ops_a_borrar:
+                    for op in ops_a_borrar:
+                        if op in st.session_state.lista_operadores:
+                            st.session_state.lista_operadores.remove(op)
                     guardar_catalogos_en_disco()
-                    st.success(f"Operador {op_del} eliminado.")
+                    st.success(f"✅ Operadores eliminados correctamente: {', '.join(ops_a_borrar)}")
                     st.rerun()
+                else:
+                    st.warning("⚠️ No has seleccionado ningún operador para eliminar.")
+
         elif tipo_del == "Cliente completo":
-            cli_del = st.selectbox("Cliente a eliminar:", options=st.session_state.lista_clientes)
-            if st.button("🗑️ Eliminar Cliente"):
-                if cli_del in st.session_state.lista_clientes:
-                    st.session_state.lista_clientes.remove(cli_del)
-                    if cli_del in st.session_state.db_clientes:
-                        del st.session_state.db_clientes[cli_del]
+            df_cli_chk = pd.DataFrame({"Cliente ID": st.session_state.lista_clientes})
+            df_cli_chk.insert(0, "Seleccionar", False)
+            
+            edited_cli = st.data_editor(
+                df_cli_chk,
+                column_config={"Seleccionar": st.column_config.CheckboxColumn(required=True)},
+                hide_index=True,
+                key="editor_cli_del"
+            )
+            
+            if st.button("🗑️ Eliminar Clientes Seleccionados"):
+                cli_a_borrar = edited_cli[edited_cli["Seleccionar"]]["Cliente ID"].tolist()
+                if cli_a_borrar:
+                    for cli in cli_a_borrar:
+                        if cli in st.session_state.lista_clientes:
+                            st.session_state.lista_clientes.remove(cli)
+                        if cli in st.session_state.db_clientes:
+                            del st.session_state.db_clientes[cli]
                     guardar_catalogos_en_disco()
-                    st.success(f"Cliente {cli_del} eliminado.")
+                    st.success(f"✅ Clientes eliminados correctamente: {', '.join(cli_a_borrar)}")
                     st.rerun()
+                else:
+                    st.warning("⚠️ No has seleccionado ningún cliente para eliminar.")
 
     with tab_admin4:
         st.subheader("📊 Historial General de Registros")
@@ -792,6 +841,9 @@ elif st.session_state.etapa_idx == 2:
                                index=sucursales_disp.index(st.session_state.sel_sucursal_e2) if st.session_state.sel_sucursal_e2 in sucursales_disp else 0,
                                key="sel_sucursal_e2", on_change=al_cambiar_sucursal_e2)
 
+    # Actualizamos los valores dinámicamente antes de mostrarlos
+    actualizar_datos_cliente()
+
     st.markdown(f"""
         <div style="background-color: rgba(49, 51, 63, 0.1); padding: 15px; border-radius: 6px; border: 1px solid rgba(49, 51, 63, 0.2);">
             <p><strong>📞 Contacto:</strong> {st.session_state.cli_contacto if st.session_state.cli_contacto else 'N/D'}</p>
@@ -807,7 +859,7 @@ elif st.session_state.etapa_idx == 2:
     col_t1, col_t2 = st.columns(2)
     with col_t1:
         st.session_state.km_llegada_cliente = st.number_input("KM Llegada con Cliente:", value=float(st.session_state.km_llegada_cliente), step=1.0)
-        if st.button("⏱️️ Registrar Hora Llegada Cliente"):
+        if st.button("⏱ Registrar Hora Llegada Cliente"):
             st.session_state.hora_llegada_cliente = obtener_hora_mexico()
             guardar_borrador_de_disco()
             st.success(f"Registrada: {st.session_state.hora_llegada_cliente}")
