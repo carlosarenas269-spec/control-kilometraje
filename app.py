@@ -593,7 +593,7 @@ if es_admin:
                 try:
                     df_masivo = pd.read_csv(archivo_subido_masivo) if archivo_subido_masivo.name.endswith(".csv") else pd.read_excel(archivo_subido_masivo)
                     st.dataframe(df_masivo.head())
-                    if st.button(f"🚀 Procesar e Importar"):
+                    if st.button("🚀 Procesar e Importar"):
                         contador_exito = 0
                         for _, row in df_masivo.iterrows():
                             if tipo_gestion == "Unidad":
@@ -608,202 +608,258 @@ if es_admin:
                                     contador_exito += 1
                             elif tipo_gestion == "Cliente y Sucursal":
                                 num_c = str(row.get("num_cliente", row.iloc[0] if len(row)>0 else "")).strip().replace(".0", "")
-                                nom_s = str(row.get("nombre", row.iloc[1] if len(row)>1 else "Principal")).strip()
-                                cont_s = str(row.get("contacto", row.iloc[2] if len(row)>2 else "")).strip()
-                                tel_s = str(row.get("telefono", row.iloc[3] if len(row)>3 else "")).strip()
-                                lat_s = float(row.get("latitud", 25.844412)) if len(row)>4 else 25.844412
-                                lon_s = float(row.get("longitud", -100.395043)) if len(row)>5 else -100.395043
+                                nom_s = str(row.get("nombre", row.iloc[1] if len(row)>1 else "Sucursal")).strip()
                                 if num_c and num_c.lower() != 'nan':
-                                    if num_c not in st.session_state.lista_clientes: st.session_state.lista_clientes.append(num_c)
-                                    if num_c not in st.session_state.db_clientes: st.session_state.db_clientes[num_c] = {}
+                                    if num_c not in st.session_state.lista_clientes:
+                                        st.session_state.lista_clientes.append(num_c)
+                                    if num_c not in st.session_state.db_clientes:
+                                        st.session_state.db_clientes[num_c] = {}
                                     st.session_state.db_clientes[num_c][nom_s] = {
-                                        "contacto": cont_s if cont_s.lower()!='nan' else "",
-                                        "telefono": tel_s if tel_s.lower()!='nan' else "",
-                                        "latitud": lat_s,
-                                        "longitud": asegurar_longitud_negativa(lon_s)
+                                        "contacto": str(row.get("contacto", "")),
+                                        "telefono": str(row.get("telefono", "")),
+                                        "latitud": float(row.get("latitud", 25.844412)),
+                                        "longitud": asegurar_longitud_negativa(float(row.get("longitud", -100.293652)))
                                     }
                                     contador_exito += 1
                         guardar_catalogos_en_disco()
-                        st.success(f"✅ Se importaron {contador_exito} registros correctamente.")
+                        st.success(f"✅ Importación masiva completada con éxito. Registros procesados: {contador_exito}")
                         st.rerun()
                 except Exception as e:
-                    st.error(f"Error procesando el archivo masivo: {e}")
+                    st.error(f"Error al procesar archivo masivo: {e}")
 
     with tab_admin2:
-        st.subheader("🔗 Asignación Predeterminada Unidad ➔ Operador")
-        with st.form("form_asignacion_masiva"):
-            nueva_asig = {}
-            for u in st.session_state.lista_unidades:
-                op_actual = st.session_state.asig_unidad_operador.get(u, st.session_state.lista_operadores[0])
-                idx_op = st.session_state.lista_operadores.index(op_actual) if op_actual in st.session_state.lista_operadores else 0
-                sel_op = st.selectbox(f"Unidad {u}:", options=st.session_state.lista_operadores, index=idx_op, key=f"asig_{u}")
-                nueva_asig[u] = sel_op
-            if st.form_submit_button("💾 Guardar Asignaciones"):
-                st.session_state.asig_unidad_operador = nueva_asig
+        st.subheader("Enlazar Unidad con Operador Habitual")
+        with st.form("form_asignacion"):
+            uni_sel_a = st.selectbox("Selecciona Unidad:", options=st.session_state.lista_unidades)
+            op_sel_a = st.selectbox("Selecciona Operador Habitual:", options=st.session_state.lista_operadores, 
+                                    index=st.session_state.lista_operadores.index(st.session_state.asig_unidad_operador.get(uni_sel_a, st.session_state.lista_operadores[0])) if st.session_state.asig_unidad_operador.get(uni_sel_a) in st.session_state.lista_operadores else 0)
+            if st.form_submit_button("🔗 Guardar Asignación"):
+                st.session_state.asig_unidad_operador[uni_sel_a] = op_sel_a
                 guardar_catalogos_en_disco()
-                st.success("✅ Asignaciones actualizadas correctamente.")
+                st.success(f"✅ Unidad {uni_sel_a} asignada a {op_sel_a}")
                 st.rerun()
+        
+        st.markdown("---")
+        st.write("📊 **Asignaciones Actuales:**")
+        df_asig_view = pd.DataFrame([{"Unidad": u, "Operador": o} for u, o in st.session_state.asig_unidad_operador.items()])
+        st.dataframe(df_asig_view, use_container_width=True)
 
     with tab_admin3:
         st.subheader("🗑️ Eliminar Elementos de Catálogos")
-        col_el1, col_el2, col_el3 = st.columns(3)
-        with col_el1:
-            uni_a_borrar = st.selectbox("Unidad a eliminar:", options=[""] + st.session_state.lista_unidades)
-            if st.button("Eliminar Unidad") and uni_a_borrar:
-                st.session_state.lista_unidades.remove(uni_a_borrar)
-                if uni_a_borrar in st.session_state.asig_unidad_operador:
-                    del st.session_state.asig_unidad_operador[uni_a_borrar]
-                guardar_catalogos_en_disco()
-                st.success(f"Unidad {uni_a_borrar} eliminada.")
-                st.rerun()
-        with col_el2:
-            op_a_borrar = st.selectbox("Operador a eliminar:", options=[""] + st.session_state.lista_operadores)
-            if st.button("Eliminar Operador") and op_a_borrar:
-                st.session_state.lista_operadores.remove(op_a_borrar)
-                guardar_catalogos_en_disco()
-                st.success(f"Operador {op_a_borrar} eliminado.")
-                st.rerun()
-        with col_el3:
-            cli_a_borrar = st.selectbox("Cliente a eliminar:", options=[""] + st.session_state.lista_clientes)
-            if st.button("Eliminar Cliente") and cli_a_borrar:
-                st.session_state.lista_clientes.remove(cli_a_borrar)
-                if cli_a_borrar in st.session_state.db_clientes:
-                    del st.session_state.db_clientes[cli_a_borrar]
-                guardar_catalogos_en_disco()
-                st.success(f"Cliente {cli_a_borrar} eliminado.")
-                st.rerun()
+        tipo_del = st.selectbox("Selecciona catálogo a modificar:", ["Unidad", "Operador", "Cliente completo"])
+        if tipo_del == "Unidad":
+            uni_del = st.selectbox("Unidad a eliminar:", options=st.session_state.lista_unidades)
+            if st.button("🗑️ Eliminar Unidad"):
+                if uni_del in st.session_state.lista_unidades:
+                    st.session_state.lista_unidades.remove(uni_del)
+                    if uni_del in st.session_state.asig_unidad_operador:
+                        del st.session_state.asig_unidad_operador[uni_del]
+                    guardar_catalogos_en_disco()
+                    st.success(f"Unidad {uni_del} eliminada.")
+                    st.rerun()
+        elif tipo_del == "Operador":
+            op_del = st.selectbox("Operador a eliminar:", options=st.session_state.lista_operadores)
+            if st.button("🗑️ Eliminar Operador"):
+                if op_del in st.session_state.lista_operadores:
+                    st.session_state.lista_operadores.remove(op_del)
+                    guardar_catalogos_en_disco()
+                    st.success(f"Operador {op_del} eliminado.")
+                    st.rerun()
+        elif tipo_del == "Cliente completo":
+            cli_del = st.selectbox("Cliente a eliminar:", options=st.session_state.lista_clientes)
+            if st.button("🗑️ Eliminar Cliente"):
+                if cli_del in st.session_state.lista_clientes:
+                    st.session_state.lista_clientes.remove(cli_del)
+                    if cli_del in st.session_state.db_clientes:
+                        del st.session_state.db_clientes[cli_del]
+                    guardar_catalogos_en_disco()
+                    st.success(f"Cliente {cli_del} eliminado.")
+                    st.rerun()
 
     with tab_admin4:
-        st.subheader("📊 Historial General de Registros de Viajes")
+        st.subheader("📊 Historial General de Registros")
         if os.path.exists(ARCHIVO_REGISTROS):
-            df_historial = pd.read_excel(ARCHIVO_REGISTROS)
-            st.dataframe(df_historial, use_container_width=True)
-            with open(ARCHIVO_REGISTROS, "rb") as f_down:
-                st.download_button("📥 Descargar Base Completa de Viajes (Excel)", data=f_down, file_name="registros_rutas.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-            if st.button("🗑️ Vaciar Historial de Viajes (¡Peligro!)"):
-                try:
-                    os.remove(ARCHIVO_REGISTROS)
-                    st.success("Historial vaciado correctamente.")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error al limpiar: {e}")
+            df_reg = pd.read_excel(ARCHIVO_REGISTROS)
+            st.dataframe(df_reg, use_container_width=True)
+            with open(ARCHIVO_REGISTROS, "rb") as f_reg:
+                st.download_button("📥 Descargar Base de Registros Completa", data=f_reg, file_name="registros_rutas.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
-            st.info("No hay registros de viajes guardados todavía.")
-    st.markdown("---")
+            st.info("No hay registros de rutas guardados todavía.")
 
 # ==========================================
-# FLUJO DE ETAPAS DE OPERACIÓN (1 A 3)
+# CUERPO PRINCIPAL / ETAPAS DE OPERACIÓN
 # ==========================================
 if st.session_state.etapa_idx == 0:
     st.subheader("🟢 Etapa 1: Salida de Patio Base")
-    with st.form("form_etapa1"):
-        col1, col2 = st.columns(2)
-        with col1:
-            idx_u = st.session_state.lista_unidades.index(st.session_state.unidad_activa) if st.session_state.unidad_activa in st.session_state.lista_unidades else 0
-            unidad_sel = st.selectbox("Unidad:", options=st.session_state.lista_unidades, index=idx_u, key="sel_unidad_e1")
-            
-            # Cálculo automático de operador asignado
-            op_sugerido = st.session_state.asig_unidad_operador.get(unidad_sel, st.session_state.lista_operadores[0])
-            if op_sugerido not in st.session_state.lista_operadores:
-                st.session_state.lista_operadores.append(op_sugerido)
-            idx_op = st.session_state.lista_operadores.index(op_sugerido)
-            operador_sel = st.selectbox("Operador Asignado:", options=st.session_state.lista_operadores, index=idx_op)
-        with col2:
-            km_salida = st.number_input("Kilometraje Salida Patio:", value=float(st.session_state.km_salida_patio), step=1.0)
-            hora_salida_val = st.text_input("Hora Salida Patio:", value=st.session_state.hora_salida_patio if st.session_state.hora_salida_patio else obtener_hora_mexico())
-        
-        if st.form_submit_button("💾 Guardar y Avanzar a Pedrera ➔"):
-            st.session_state.unidad_activa = unidad_sel
-            st.session_state.operador_activo = operador_sel
-            st.session_state.km_salida_patio = km_salida
-            st.session_state.hora_salida_patio = hora_salida_val
-            st.session_state.etapa_idx = 1
-            guardar_borrador_de_disco()
-            st.success("✅ ¡Salida de patio registrada con éxito!")
-            st.rerun()
+    st.write(config_actual.get("texto_bienvenida", "✨ ¡Bienvenido al sistema operativo de rutas!"))
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        uni_sel = st.selectbox("Selecciona la Unidad:", options=st.session_state.lista_unidades, 
+                               index=st.session_state.lista_unidades.index(st.session_state.unidad_activa) if st.session_state.unidad_activa in st.session_state.lista_unidades else 0,
+                               key="sel_unidad_e1", on_change=al_cambiar_unidad)
+    with col2:
+        op_sugerido = st.session_state.asig_unidad_operador.get(st.session_state.unidad_activa, st.session_state.lista_operadores[0])
+        if op_sugerido not in st.session_state.lista_operadores:
+            op_sugerido = st.session_state.lista_operadores[0]
+        st.session_state.operador_activo = st.selectbox("Operador Asignado:", options=st.session_state.lista_operadores,
+                                                        index=st.session_state.lista_operadores.index(op_sugerido))
+
+    # Mostrar foto del operador si existe
+    nombre_op_limpio = "".join([c if c.isalnum() else "_" for c in st.session_state.operador_activo])
+    tamano_f = config_actual.get("tamano_foto_operador", 120)
+    foto_encontrada = None
+    if os.path.exists(CARPETA_FOTOS_OPERADORES):
+        for f_op in os.listdir(CARPETA_FOTOS_OPERADORES):
+            if f_op.startswith(nombre_op_limpio + "."):
+                foto_encontrada = os.path.join(CARPETA_FOTOS_OPERADORES, f_op)
+                break
+    
+    if foto_encontrada:
+        col_f1, col_f2 = st.columns([1, 4])
+        with col_f1:
+            st.image(foto_encontrada, width=tamano_f)
+        with col_f2:
+            st.write(f"**Operador activo:** {st.session_state.operador_activo}")
+            st.write(f"**Unidad en turno:** {st.session_state.unidad_activa}")
+
+    st.markdown("---")
+    st.session_state.km_salida_patio = st.number_input("Kilometraje de Salida (Patio Base):", value=float(st.session_state.km_salida_patio), step=1.0)
+    
+    if st.button("📍 Registrar Salida y Continuar"):
+        st.session_state.hora_salida_patio = obtener_hora_mexico()
+        st.session_state.etapa_idx = 1
+        guardar_borrador_de_disco()
+        st.success("✅ Salida de patio registrada correctamente. Avanzando a la siguiente etapa...")
+        st.rerun()
 
 elif st.session_state.etapa_idx == 1:
-    st.subheader("🟡 Etapa Intermedia: Pedrera (Llegada y Salida)")
-    with st.form("form_etapa2"):
-        col1, col2 = st.columns(2)
-        with col1:
-            km_lleg_ped = st.number_input("Kilometraje Llegada a Pedrera:", value=float(st.session_state.km_llegada_pedrera), step=1.0)
-            hora_lleg_ped = st.text_input("Hora Llegada a Pedrera:", value=st.session_state.hora_llegada_pedrera if st.session_state.hora_llegada_pedrera else obtener_hora_mexico())
-        with col2:
-            km_sal_ped = st.number_input("Kilometraje Salida de Pedrera:", value=float(st.session_state.km_salida_pedrera), step=1.0)
-            hora_sal_ped = st.text_input("Hora Salida de Pedrera:", value=st.session_state.hora_salida_pedrera if st.session_state.hora_salida_pedrera else obtener_hora_mexico())
-        
-        if st.form_submit_button("💾 Guardar y Avanzar a Cliente ➔"):
-            st.session_state.km_llegada_pedrera = km_lleg_ped
-            st.session_state.hora_llegada_pedrera = hora_lleg_ped
-            st.session_state.km_salida_pedrera = km_sal_ped
-            st.session_state.hora_salida_pedrera = hora_sal_ped
+    st.subheader("🟡 Etapa Intermedia: Pedrera (Llegada / Salida)")
+    st.write(f"**Unidad:** {st.session_state.unidad_activa} | **Operador:** {st.session_state.operador_activo}")
+    
+    col_p1, col_p2 = st.columns(2)
+    with col_p1:
+        st.markdown("### 📥 Llegada a Pedrera")
+        st.session_state.km_llegada_pedrera = st.number_input("KM Llegada a Pedrera:", value=float(st.session_state.km_llegada_pedrera), step=1.0)
+        if st.button("⏱️ Registrar Hora Llegada Pedrera"):
+            st.session_state.hora_llegada_pedrera = obtener_hora_mexico()
+            guardar_borrador_de_disco()
+            st.success(f"Hora de llegada registrada: {st.session_state.hora_llegada_pedrera}")
+            st.rerun()
+        if st.session_state.hora_llegada_pedrera:
+            st.info(f"Registrada: {st.session_state.hora_llegada_pedrera}")
+
+    with col_p2:
+        st.markdown("### 📤 Salida de Pedrera (Cargado)")
+        st.session_state.km_salida_pedrera = st.number_input("KM Salida de Pedrera:", value=float(st.session_state.km_salida_pedrera), step=1.0)
+        if st.button("⏱️ Registrar Hora Salida Pedrera"):
+            st.session_state.hora_salida_pedrera = obtener_hora_mexico()
+            guardar_borrador_de_disco()
+            st.success(f"Hora de salida registrada: {st.session_state.hora_salida_pedrera}")
+            st.rerun()
+        if st.session_state.hora_salida_pedrera:
+            st.info(f"Registrada: {st.session_state.hora_salida_pedrera}")
+
+    st.markdown("---")
+    col_nav1, col_nav2 = st.columns(2)
+    with col_nav1:
+        if st.button("⬅️ Volver a Etapa 1"):
+            st.session_state.etapa_idx = 0
+            st.rerun()
+    with col_nav2:
+        if st.button("➡️ Avanzar a Etapa Cliente"):
             st.session_state.etapa_idx = 2
             guardar_borrador_de_disco()
-            st.success("✅ ¡Información de pedrera guardada!")
             st.rerun()
 
 elif st.session_state.etapa_idx == 2:
     st.subheader("🟠 Etapa 2: Llegada y Salida con el Cliente")
+    st.write(f"**Unidad:** {st.session_state.unidad_activa} | **Operador:** {st.session_state.operador_activo}")
     
     col_c1, col_c2 = st.columns(2)
     with col_c1:
-        idx_cli = st.session_state.lista_clientes.index(st.session_state.sel_cliente_e2) if st.session_state.sel_cliente_e2 in st.session_state.lista_clientes else 0
-        st.selectbox("Número de Cliente (ID):", options=st.session_state.lista_clientes, index=idx_cli, key="sel_cliente_e2", on_change=al_cambiar_cliente_e2)
-        
-        cli_limpio = str(st.session_state.sel_cliente_e2).strip().replace(".0", "")
-        sucursales_disp = list(st.session_state.db_clientes.get(cli_limpio, {"Principal": {}}).keys())
-        sucursales_disp = [s for s in sucursales_disp if str(s).lower() != 'nan' and str(s).strip() != '']
-        if not sucursales_disp: sucursales_disp = ["Principal"]
-        
-        idx_suc = sucursales_disp.index(st.session_state.sel_sucursal_e2) if st.session_state.sel_sucursal_e2 in sucursales_disp else 0
-        st.selectbox("Sucursal / Razón Social:", options=sucursales_disp, index=idx_suc, key="sel_sucursal_e2", on_change=al_cambiar_sucursal_e2)
+        cli_sel = st.selectbox("Número de Cliente:", options=st.session_state.lista_clientes,
+                               index=st.session_state.lista_clientes.index(st.session_state.sel_cliente_e2) if st.session_state.sel_cliente_e2 in st.session_state.lista_clientes else 0,
+                               key="sel_cliente_e2", on_change=al_cambiar_cliente_e2)
     
+    cli_limpio = str(st.session_state.sel_cliente_e2).strip().replace(".0", "")
+    sucursales_disp = list(st.session_state.db_clientes.get(cli_limpio, {"Principal": {}}).keys())
+    sucursales_disp = [s for s in sucursales_disp if str(s).lower() != 'nan' and str(s).strip() != '']
+    if not sucursales_disp: sucursales_disp = ["Principal"]
+
     with col_c2:
-        st.info(f"👤 **Contacto:** {st.session_state.cli_contacto if st.session_state.cli_contacto else 'N/D'}\n\n📞 **Teléfono:** {st.session_state.cli_telefono if st.session_state.cli_telefono else 'N/D'}")
-        
-    with st.form("form_etapa_cliente"):
-        col_m1, col_m2 = st.columns(2)
-        with col_m1:
-            km_lleg_cli = st.number_input("Kilometraje Llegada al Cliente:", value=float(st.session_state.km_llegada_cliente), step=1.0)
-            hora_lleg_cli = st.text_input("Hora Llegada al Cliente:", value=st.session_state.hora_llegada_cliente if st.session_state.hora_llegada_cliente else obtener_hora_mexico())
-        with col_m2:
-            km_sal_cli = st.number_input("Kilometraje Salida del Cliente:", value=float(st.session_state.km_salida_cliente), step=1.0)
-            hora_sal_cli = st.text_input("Hora Salida del Cliente:", value=st.session_state.hora_salida_cliente if st.session_state.hora_salida_cliente else obtener_hora_mexico())
-        
-        if st.form_submit_button("💾 Guardar y Avanzar a Cierre de Ruta ➔"):
-            st.session_state.km_llegada_cliente = km_lleg_cli
-            st.session_state.hora_llegada_cliente = hora_lleg_cli
-            st.session_state.km_salida_cliente = km_sal_cli
-            st.session_state.hora_salida_cliente = hora_sal_cli
+        suc_sel = st.selectbox("Sucursal / Destino:", options=sucursales_disp,
+                               index=sucursales_disp.index(st.session_state.sel_sucursal_e2) if st.session_state.sel_sucursal_e2 in sucursales_disp else 0,
+                               key="sel_sucursal_e2", on_change=al_cambiar_sucursal_e2)
+
+    st.markdown(f"""
+        <div style="background-color: rgba(49, 51, 63, 0.1); padding: 15px; border-radius: 6px; border: 1px solid rgba(49, 51, 63, 0.2);">
+            <p><strong>📞 Contacto:</strong> {st.session_state.cli_contacto if st.session_state.cli_contacto else 'N/D'}</p>
+            <p><strong>📱 Teléfono:</strong> {st.session_state.cli_telefono if st.session_state.cli_telefono else 'N/D'}</p>
+            <p><strong>🗺️ Coordenadas Destino:</strong> Lat: {st.session_state.cli_latitud}, Lon: {st.session_state.cli_longitud}</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    link_google_maps = f"https://www.google.com/maps/search/?api=1&query={st.session_state.cli_latitud},{st.session_state.cli_longitud}"
+    st.markdown(f"🔗 [Abrir Ubicación en Google Maps]({link_google_maps})", unsafe_allow_html=True)
+    st.markdown("---")
+
+    col_t1, col_t2 = st.columns(2)
+    with col_t1:
+        st.session_state.km_llegada_cliente = st.number_input("KM Llegada con Cliente:", value=float(st.session_state.km_llegada_cliente), step=1.0)
+        if st.button("⏱️️ Registrar Hora Llegada Cliente"):
+            st.session_state.hora_llegada_cliente = obtener_hora_mexico()
+            guardar_borrador_de_disco()
+            st.success(f"Registrada: {st.session_state.hora_llegada_cliente}")
+            st.rerun()
+        if st.session_state.hora_llegada_cliente:
+            st.info(f"Hora Llegada: {st.session_state.hora_llegada_cliente}")
+
+    with col_t2:
+        st.session_state.km_salida_cliente = st.number_input("KM Salida con Cliente (Descargado):", value=float(st.session_state.km_salida_cliente), step=1.0)
+        if st.button("⏱️ Registrar Hora Salida Cliente"):
+            st.session_state.hora_salida_cliente = obtener_hora_mexico()
+            guardar_borrador_de_disco()
+            st.success(f"Registrada: {st.session_state.hora_salida_cliente}")
+            st.rerun()
+        if st.session_state.hora_salida_cliente:
+            st.info(f"Hora Salida: {st.session_state.hora_salida_cliente}")
+
+    st.markdown("---")
+    col_nc1, col_nc2 = st.columns(2)
+    with col_nc1:
+        if st.button("⬅️ Volver a Etapa Pedrera"):
+            st.session_state.etapa_idx = 1
+            st.rerun()
+    with col_nc2:
+        if st.button("➡️ Avanzar a Cierre de Ruta"):
             st.session_state.etapa_idx = 3
             guardar_borrador_de_disco()
-            st.success("✅ ¡Datos del cliente registrados!")
             st.rerun()
 
 elif st.session_state.etapa_idx == 3:
-    st.subheader("🔴 Etapa 3: Cierre de Ruta / Regreso a Patio")
-    with st.form("form_etapa3"):
-        col1, col2 = st.columns(2)
-        with col1:
-            km_final = st.number_input("Kilometraje Final de Viaje (Regreso):", value=float(st.session_state.km_final_viaje), step=1.0)
-            hora_cierre = st.text_input("Hora Cierre de Viaje:", value=st.session_state.hora_cierre_viaje if st.session_state.hora_cierre_viaje else obtener_hora_mexico())
-        with col2:
-            st.markdown("### Resumen Rápido del Viaje")
-            st.write(f"🚛 **Unidad:** {st.session_state.unidad_activa}")
-            st.write(f"👤 **Operador:** {st.session_state.operador_activo}")
-            st.write(f"📍 **Cliente:** {st.session_state.get('sel_cliente_e2', 'N/D')} - {st.session_state.get('sel_sucursal_e2', 'N/D')}")
-        
-        if st.form_submit_button("🏁 Finalizar y Registrar Viaje Completo"):
-            st.session_state.km_final_viaje = km_final
-            st.session_state.hora_cierre_viaje = hora_cierre
-            
-            # Consolidar y guardar en el Excel general de rutas
+    st.subheader("🔴 Etapa 3: Cierre de Ruta / Regreso a Base")
+    st.write(f"**Unidad:** {st.session_state.unidad_activa} | **Operador:** {st.session_state.operador_activo}")
+    
+    st.session_state.km_final_viaje = st.number_input("KM Final de Ruta (Regreso a Patio):", value=float(st.session_state.km_final_viaje), step=1.0)
+    
+    if st.button("⏱️ Registrar Hora de Cierre de Viaje"):
+        st.session_state.hora_cierre_viaje = obtener_hora_mexico()
+        guardar_borrador_de_disco()
+        st.success(f"Cierre registrado: {st.session_state.hora_cierre_viaje}")
+        st.rerun()
+
+    if st.session_state.hora_cierre_viaje:
+        st.info(f"Hora de Cierre: {st.session_state.hora_cierre_viaje}")
+
+    st.markdown("---")
+    if not st.session_state.ruta_guardada:
+        if st.button("💾 Guardar Viaje Completo en Historial"):
             registro_final = {
-                "Fecha de Registro": obtener_hora_mexico(),
+                "Fecha Registro": obtener_hora_mexico(),
                 "Unidad": st.session_state.unidad_activa,
                 "Operador": st.session_state.operador_activo,
-                "Cliente ID": st.session_state.get("sel_cliente_e2", ""),
+                "Cliente ID": st.session_state.sel_cliente_e2,
                 "Sucursal": st.session_state.get("sel_sucursal_e2", ""),
                 "KM Salida Patio": st.session_state.km_salida_patio,
                 "Hora Salida Patio": st.session_state.hora_salida_patio,
@@ -815,15 +871,29 @@ elif st.session_state.etapa_idx == 3:
                 "Hora Llegada Cliente": st.session_state.hora_llegada_cliente,
                 "KM Salida Cliente": st.session_state.km_salida_cliente,
                 "Hora Salida Cliente": st.session_state.hora_salida_cliente,
-                "KM Final Viaje": km_final,
-                "Hora Cierre Viaje": hora_cierre,
-                "KM Totales Recorridos": km_final - st.session_state.km_salida_patio
+                "KM Final Viaje": st.session_state.km_final_viaje,
+                "Hora Cierre Viaje": st.session_state.hora_cierre_viaje,
+                "Kilometraje Recorrido": st.session_state.km_final_viaje - st.session_state.km_salida_patio
             }
             guardar_en_excel(registro_final, ARCHIVO_REGISTROS)
             st.session_state.ruta_guardada = True
-            
-            if os.path.exists(ARCHIVO_BORRADOR):
-                try: os.remove(ARCHIVO_BORRADOR)
-                except: pass
-                
-            st.success("🎉 ¡Viaje cerrado y guardado exitosamente en el historial general!")
+            guardar_borrador_de_disco()
+            st.success("🎉 ¡Viaje guardado exitosamente en el historial de rutas!")
+    else:
+        st.success("✅ Este viaje ya se encuentra guardado en el sistema.")
+
+    if st.button("🔄 Iniciar Nuevo Viaje (Reiniciar Formulario)"):
+        st.session_state.etapa_idx = 0
+        st.session_state.hora_salida_patio = ""
+        st.session_state.hora_llegada_pedrera = ""
+        st.session_state.hora_salida_pedrera = ""
+        st.session_state.hora_llegada_cliente = ""
+        st.session_state.hora_salida_cliente = ""
+        st.session_state.hora_cierre_viaje = ""
+        st.session_state.ruta_guardada = False
+        guardar_borrador_de_disco()
+        st.rerun()
+
+    if st.button("⬅️ Volver a Etapa Cliente"):
+        st.session_state.etapa_idx = 2
+        st.rerun()
