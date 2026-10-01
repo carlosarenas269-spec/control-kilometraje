@@ -6,7 +6,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 from PIL import Image
-from sqlalchemy import create_engine
+from supabase import create_client, Client
 
 # ==========================================
 # CONFIGURACIÓN Y PERSISTENCIA DE SUPABASE Y DATOS
@@ -25,17 +25,14 @@ os.makedirs(CARPETA_LOGO, exist_ok=True)
 os.makedirs(CARPETA_FOTOS_OPERADORES, exist_ok=True)
 
 @st.cache_resource
-def obtener_motor_db():
+def init_supabase() -> Client:
     try:
-        if "DATABASE_URL" in st.secrets:
-            db_url = st.secrets["DATABASE_URL"]
-            if db_url.startswith("postgres://"):
-                db_url = db_url.replace("postgres://", "postgresql+psycopg2://", 1)
-            elif db_url.startswith("postgresql://") and "+psycopg2" not in db_url:
-                db_url = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
-            return create_engine(db_url)
-    except Exception:
-        pass
+        if "supabase" in st.secrets:
+            url = st.secrets["supabase"]["url"]
+            key = st.secrets["supabase"]["key"]
+            return create_client(url, key)
+    except Exception as e:
+        print(f"Error al conectar con Supabase: {e}")
     return None
 
 def cargar_configuracion():
@@ -192,7 +189,7 @@ def cargar_borrador_de_disco():
 
 def guardar_catalogos_en_disco():
     try:
-        # Guardar localmente
+        # Guardar localmente en Excel
         with pd.ExcelWriter(ARCHIVO_CATALOGOS, engine='openpyxl') as writer:
             pd.DataFrame({"Unidades": st.session_state.lista_unidades}).to_excel(writer, sheet_name="Unidades", index=False)
             pd.DataFrame({"Operadores": st.session_state.lista_operadores}).to_excel(writer, sheet_name="Operadores", index=False)
@@ -208,25 +205,25 @@ def guardar_catalogos_en_disco():
                     })
             pd.DataFrame(clientes_data).to_excel(writer, sheet_name="Clientes", index=False)
         
-        # Sincronizar con Supabase (PostgreSQL)
-        engine = obtener_motor_db()
-        if engine and clientes_data:
-            df_supabase = pd.DataFrame(clientes_data)
-            with engine.begin() as conn:
-                df_supabase.to_sql("clientes_fletes", con=conn, if_exists="replace", index=False)
+        # Sincronizar con Supabase usando la API oficial
+        supabase = init_supabase()
+        if supabase and clientes_data:
+            supabase.table("clientes_fletes").delete().neq("id", 0).execute()
+            supabase.table("clientes_fletes").insert(clientes_data).execute()
     except Exception as e:
         print(f"Error al guardar catálogos: {e}")
 
 def cargar_catalogos_de_disco():
     cargado_desde_db = False
-    engine = obtener_motor_db()
-    if engine:
+    supabase = init_supabase()
+    if supabase:
         try:
-            df_c = pd.read_sql("SELECT * FROM clientes_fletes", con=engine)
-            if not df_c.empty:
+            response = supabase.table("clientes_fletes").select("*").execute()
+            rows = response.data
+            if rows:
                 nueva_db = {}
                 lista_c = []
-                for _, row in df_c.iterrows():
+                for row in rows:
                     num_cli = str(row.get("num_cliente", "")).strip().replace(".0", "")
                     suc_nombre = str(row.get("nombre", "Principal"))
                     if num_cli and num_cli.lower() != 'nan':
@@ -1028,7 +1025,7 @@ elif st.session_state.etapa_idx == 2:
             st.session_state.etapa_idx = 1
             st.rerun()
     with col_nc2:
-        if st.button("➡️️ Avanzar a Cierre de Ruta"):
+        if st.button("➡️ Avanzar a Cierre de Ruta"):
             st.session_state.etapa_idx = 3
             guardar_borrador_de_disco()
             st.rerun()
@@ -1090,6 +1087,6 @@ elif st.session_state.etapa_idx == 3:
         guardar_borrador_de_disco()
         st.rerun()
 
-    if st.button("⬅️️ Volver a Etapa Cliente"):
+    if st.button("⬅️ Volver a Etapa Cliente"):
         st.session_state.etapa_idx = 2
         st.rerun()
