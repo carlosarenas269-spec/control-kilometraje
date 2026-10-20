@@ -342,6 +342,7 @@ def limpiar_id_cliente(val):
 def actualizar_datos_cliente():
     raw_cli = str(st.session_state.get("sel_cliente_e2", ""))
     cli = limpiar_id_cliente(raw_cli)
+    suc = st.session_state.get("sel_sucursal_e2", "")
     
     cliente_encontrado = None
     if cli in st.session_state.db_clientes:
@@ -359,17 +360,16 @@ def actualizar_datos_cliente():
         sucursales = [s for s in dict_sucursales.keys() if str(s).lower() != 'nan' and str(s).strip() != '']
         if not sucursales:
             sucursales = ["Principal"]
-
-        suc_actual = st.session_state.get("sel_sucursal_e2", "")
-        if suc_actual not in dict_sucursales:
-            suc_actual = sucursales[0]
-            st.session_state.sel_sucursal_e2 = suc_actual
-
-        info_sucursal = dict_sucursales.get(suc_actual, {})
+            
+        if suc not in sucursales:
+            st.session_state.sel_sucursal_e2 = sucursales[0]
+            suc = sucursales[0]
+        
+        info_sucursal = dict_sucursales.get(suc, {})
         
         lat_val = info_sucursal.get("latitud")
         lon_val = info_sucursal.get("longitud")
-
+        
         if lat_val is None or float(lat_val) == 25.844412:
             for otra_suc, otra_info in dict_sucursales.items():
                 if otra_info.get("latitud") and float(otra_info.get("latitud")) != 25.844412:
@@ -379,11 +379,11 @@ def actualizar_datos_cliente():
 
         st.session_state.cli_contacto = info_sucursal.get("contacto", "")
         st.session_state.cli_telefono = info_sucursal.get("telefono", "")
-        st.session_state.cli_latitud = float(lat_val) if lat_val is not None else 25.844412
-        st.session_state.cli_longitud = float(lon_val) if lon_val is not None else -100.395043
+        st.session_state.cli_latitud = float(lat_val if lat_val is not None else 25.844412)
+        st.session_state.cli_longitud = float(lon_val if lon_val is not None else -100.395043)
     else:
-        st.session_state.cli_contacto = "N/D"
-        st.session_state.cli_telefono = "N/D"
+        st.session_state.cli_contacto = ""
+        st.session_state.cli_telefono = ""
         st.session_state.cli_latitud = 25.844412
         st.session_state.cli_longitud = -100.395043
 
