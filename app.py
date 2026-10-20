@@ -155,31 +155,4 @@ def guardar_borrador_de_disco():
             "hora_salida_pedrera": st.session_state.get("hora_salida_pedrera", ""),
             "km_llegada_cliente": st.session_state.get("km_llegada_cliente", 145826.0),
             "hora_llegada_cliente": st.session_state.get("hora_llegada_cliente", ""),
-            "km_salida_cliente": st.session_state.get("km_salida_cliente", 145826.0),
-            "hora_salida_cliente": st.session_state.get("hora_salida_cliente", ""),
-            "km_final_viaje": st.session_state.get("km_final_viaje", 145826.0),
-            "hora_cierre_viaje": st.session_state.get("hora_cierre_viaje", ""),
-            "ruta_guardada": st.session_state.get("ruta_guardada", False)
-        }
-        pd.DataFrame([datos_borrador]).to_excel(ARCHIVO_BORRADOR, index=False)
-    except Exception as e:
-        print(f"Error al guardar borrador: {e}")
-
-def cargar_borrador_de_disco():
-    if os.path.exists(ARCHIVO_BORRADOR):
-        try:
-            df_b = pd.read_excel(ARCHIVO_BORRADOR)
-            if not df_b.empty:
-                row = df_b.iloc[0]
-                st.session_state.etapa_idx = int(row.get("etapa_idx", 0))
-                st.session_state.unidad_activa = str(row.get("unidad_activa", UNIDADES_DEFAULT[0]))
-                st.session_state.operador_activo = str(row.get("operador_activo", ""))
-                st.session_state.km_salida_patio = float(row.get("km_salida_patio", 145826.0))
-                st.session_state.hora_salida_patio = str(row.get("hora_salida_patio", "")) if pd.notna(row.get("hora_salida_patio")) else ""
-                st.session_state.km_llegada_pedrera = float(row.get("km_llegada_pedrera", 145826.0))
-                st.session_state.hora_llegada_pedrera = str(row.get("hora_llegada_pedrera", "")) if pd.notna(row.get("hora_llegada_pedrera")) else ""
-                st.session_state.km_salida_pedrera = float(row.get("km_salida_pedrera", 145826.0))
-                st.session_state.hora_salida_pedrera = str(row.get("hora_salida_pedrera", "")) if pd.notna(row.get("hora_salida_pedrera")) else ""
-                st.session_state.km_llegada_cliente = float(row.get("km_llegada_cliente", 145826.0))
-                st.session_state.hora_llegada_cliente = str(row.get("hora_llegada_cliente", "")) if pd.notna(row.get("hora_llegada_cliente")) else ""
-                st.session_state.km_salida_cliente = float(row.get("km_salida_cliente
+            "km_salida_cliente": st.session_state.get("km_salida_cliente", 14
