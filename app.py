@@ -186,16 +186,9 @@ def guardar_catalogos_en_disco():
             for num_cli, sucursales in st.session_state.db_clientes.items():
                 for suc_nombre, info in sucursales.items():
                     clientes_data.append({
-                        "num_cliente": num_cli,
-                        "nombre": suc_nombre,
-                        "contacto": info.get("contacto", ""),
-                        "telefono": info.get("telefono", ""),
-                        "latitud": info.get("latitud", 25.844412),
-                        "longitud": info.get("longitud", -100.293652),
-                        "tiro": info.get("tiro", ""),
-                        "Ubicación Google maps": info.get("ubicacion_google_maps", ""),
-                        "latitud y longitud": info.get("latitud_y_longitud", ""),
-                        "municipio": info.get("municipio", "")
+                        "num_cliente": num_cli, "nombre": suc_nombre,
+                        "contacto": info.get("contacto", ""), "telefono": info.get("telefono", ""),
+                        "latitud": info.get("latitud", 25.844412), "longitud": info.get("longitud", -100.293652)
                     })
             pd.DataFrame(clientes_data).to_excel(writer, sheet_name="Clientes", index=False)
     except Exception as e:
@@ -237,19 +230,16 @@ def cargar_catalogos_de_disco():
                             try: lon_val = float(row.get("longitud", -100.395043))
                             except: lon_val = -100.395043
                             
-                            def _limpiar(val):
-                                s = str(val) if pd.notna(val) else ""
-                                return "" if s.lower() == 'nan' else s.strip()
+                            contacto_val = str(row.get("contacto", ""))
+                            if contacto_val.lower() == 'nan': contacto_val = ""
+                            telefono_val = str(row.get("telefono", ""))
+                            if telefono_val.lower() == 'nan': telefono_val = ""
 
                             nueva_db[num_cli][suc_nombre] = {
-                                "contacto": _limpiar(row.get("contacto", "")),
-                                "telefono": _limpiar(row.get("telefono", "")),
+                                "contacto": contacto_val,
+                                "telefono": telefono_val,
                                 "latitud": lat_val,
-                                "longitud": asegurar_longitud_negativa(lon_val),
-                                "tiro": _limpiar(row.get("tiro", "")),
-                                "ubicacion_google_maps": _limpiar(row.get("Ubicación Google maps", row.get("ubicacion_google_maps", ""))),
-                                "latitud_y_longitud": _limpiar(row.get("latitud y longitud", row.get("latitud_y_longitud", ""))),
-                                "municipio": _limpiar(row.get("municipio", ""))
+                                "longitud": asegurar_longitud_negativa(lon_val)
                             }
                     if lista_c:
                         st.session_state.lista_clientes = lista_c
@@ -484,14 +474,14 @@ if "etapa_idx" not in st.session_state:
 CLIENTES_DEFAULT = ["3185", "1198", "1555"]
 DB_CLIENTES_DEFAULT = {
     "3185": {
-        "HOLCIM MEXICO OPERACIONES (Escobedo)": {"contacto": "GUADALUPE", "telefono": "8112345678", "latitud": 25.847237, "longitud": -100.293652, "tiro": "", "ubicacion_google_maps": "", "latitud_y_longitud": "", "municipio": ""},
-        "HOLCIM MEXICO OPERACIONES (Litos)": {"contacto": "ING. IVAN", "telefono": "8187654321", "latitud": 25.898032, "longitud": -100.200360, "tiro": "", "ubicacion_google_maps": "", "latitud_y_longitud": "", "municipio": ""}
+        "HOLCIM MEXICO OPERACIONES (Escobedo)": {"contacto": "GUADALUPE", "telefono": "8112345678", "latitud": 25.847237, "longitud": -100.293652},
+        "HOLCIM MEXICO OPERACIONES (Litos)": {"contacto": "ING. IVAN", "telefono": "8187654321", "latitud": 25.898032, "longitud": -100.200360}
     },
     "1198": {
-        "ORGANIZACIÓN Y SERVICIO PARA LA CONSTRUCCION, S.A. DE C.V.": {"contacto": "", "telefono": "2381915291", "latitud": 25.829361, "longitud": -100.230889, "tiro": "", "ubicacion_google_maps": "", "latitud_y_longitud": "", "municipio": ""}
+        "ORGANIZACIÓN Y SERVICIO PARA LA CONSTRUCCION, S.A. DE C.V.": {"contacto": "", "telefono": "2381915291", "latitud": 25.829361, "longitud": -100.230889}
     },
     "1555": {
-        "GRUPO PERFIMEXA SA DE CV": {"contacto": "", "telefono": "8115783462", "latitud": 26.004936, "longitud": -100.296356, "tiro": "", "ubicacion_google_maps": "", "latitud_y_longitud": "", "municipio": ""}
+        "GRUPO PERFIMEXA SA DE CV": {"contacto": "", "telefono": "8115783462", "latitud": 26.004936, "longitud": -100.296356}
     }
 }
 
@@ -578,22 +568,13 @@ if es_admin:
                     nom_suc = st.text_input("Nombre de la Sucursal / Razón Social:")
                     contacto = st.text_input("Persona de Contacto:")
                     telefono = st.text_input("Teléfono:")
-                    tiro_val_m = st.text_input("Tiro:")
-                    municipio_val_m = st.text_input("Municipio:")
-                    map_input = st.text_input("Coordenadas GPS, Link de Google Maps o Lat/Lon:")
+                    map_input = st.text_input("Coordenadas GPS o Link de Google Maps:")
                     if st.form_submit_button("💾 Guardar Cliente / Sucursal") and num_cli and nom_suc.strip():
                         lat, lon = extraer_lat_lon_de_texto(map_input)
                         if num_cli not in st.session_state.db_clientes: st.session_state.db_clientes[num_cli] = {}
                         if num_cli not in st.session_state.lista_clientes: st.session_state.lista_clientes.append(num_cli)
                         st.session_state.db_clientes[num_cli][nom_suc.strip()] = {
-                            "contacto": contacto.strip(),
-                            "telefono": telefono.strip(),
-                            "latitud": lat,
-                            "longitud": lon,
-                            "tiro": tiro_val_m.strip(),
-                            "ubicacion_google_maps": map_input.strip(),
-                            "latitud_y_longitud": map_input.strip(),
-                            "municipio": municipio_val_m.strip()
+                            "contacto": contacto.strip(), "telefono": telefono.strip(), "latitud": lat, "longitud": lon
                         }
                         guardar_catalogos_en_disco()
                         st.success("✅ Cliente/Sucursal guardado con éxito.")
@@ -619,112 +600,256 @@ if es_admin:
                                     contador_exito += 1
                             elif tipo_gestion == "Cliente y Sucursal":
                                 num_c = str(row.get("num_cliente", row.iloc[0])).strip().replace(".0", "")
-                                nom_s = str(row.get("nombre", row.iloc[1] if len(row) > 1 else "Principal")).strip()
-                                contacto_val = str(row.get("contacto", "")).strip() if pd.notna(row.get("contacto")) else ""
-                                telefono_val = str(row.get("telefono", "")).strip() if pd.notna(row.get("telefono")) else ""
-                                tiro_val = str(row.get("tiro", "")).strip() if pd.notna(row.get("tiro")) else ""
-                                ubicacion_maps_val = str(row.get("Ubicación Google maps", "")).strip() if pd.notna(row.get("Ubicación Google maps")) else ""
-                                lat_lon_str = str(row.get("latitud y longitud", "")).strip() if pd.notna(row.get("latitud y longitud")) else ""
-                                municipio_val = str(row.get("municipio", "")).strip() if pd.notna(row.get("municipio")) else ""
-
-                                lat_val, lon_val = 25.844412, -100.395043
-                                if pd.notna(row.get("latitud")) and pd.notna(row.get("longitud")):
-                                    try:
-                                        lat_val = float(row.get("latitud"))
-                                        lon_val = float(row.get("longitud"))
-                                    except:
-                                        pass
-                                elif ubicacion_maps_val:
-                                    lat_val, lon_val = extraer_lat_lon_de_texto(ubicacion_maps_val)
-                                elif lat_lon_str:
-                                    lat_val, lon_val = extraer_lat_lon_de_texto(lat_lon_str)
-
-                                if num_c and num_c.lower() != 'nan':
-                                    if num_c not in st.session_state.db_clientes:
-                                        st.session_state.db_clientes[num_c] = {}
-                                    if num_c not in st.session_state.lista_clientes:
-                                        st.session_state.lista_clientes.append(num_c)
-
+                                nom_s = str(row.get("nombre", row.iloc[1])).strip()
+                                if num_c and num_c.lower() != 'nan' and nom_s and nom_s.lower() != 'nan':
+                                    if num_c not in st.session_state.db_clientes: st.session_state.db_clientes[num_c] = {}
+                                    if num_c not in st.session_state.lista_clientes: st.session_state.lista_clientes.append(num_c)
                                     st.session_state.db_clientes[num_c][nom_s] = {
-                                        "contacto": contacto_val if contacto_val.lower() != 'nan' else "",
-                                        "telefono": telefono_val if telefono_val.lower() != 'nan' else "",
-                                        "latitud": lat_val,
-                                        "longitud": asegurar_longitud_negativa(lon_val),
-                                        "tiro": tiro_val if tiro_val.lower() != 'nan' else "",
-                                        "ubicacion_google_maps": ubicacion_maps_val if ubicacion_maps_val.lower() != 'nan' else "",
-                                        "latitud_y_longitud": lat_lon_str if lat_lon_str.lower() != 'nan' else "",
-                                        "municipio": municipio_val if municipio_val.lower() != 'nan' else ""
+                                        "contacto": str(row.get("contacto", "")).strip() if pd.notna(row.get("contacto", "")) else "",
+                                        "telefono": str(row.get("telefono", "")).strip() if pd.notna(row.get("telefono", "")) else "",
+                                        "latitud": float(row.get("latitud", 25.844412)),
+                                        "longitud": asegurar_longitud_negativa(float(row.get("longitud", -100.293652)))
                                     }
                                     contador_exito += 1
                         guardar_catalogos_en_disco()
-                        st.success(f"✅ Se importaron/actualizaron {contador_exito} registros correctamente.")
+                        st.success(f"✅ ¡{contador_exito} elementos importados con éxito!")
                         st.rerun()
                 except Exception as e:
-                    st.error(f"Error procesando archivo masivo: {e}")
+                    st.error(f"⚠️ Error: {e}")
 
     with tab_admin2:
-        st.markdown("### Asignación de Operadores a Unidades")
         with st.form("form_asignacion_masiva"):
-            nueva_asig = {}
-            for u in st.session_state.lista_unidades:
-                op_actual = st.session_state.asig_unidad_operador.get(u, st.session_state.lista_operadores[0])
-                idx_op = st.session_state.lista_operadores.index(op_actual) if op_actual in st.session_state.lista_operadores else 0
-                sel_op = st.selectbox(f"Unidad {u}:", options=st.session_state.lista_operadores, index=idx_op, key=f"asig_{u}")
-                nueva_asig[u] = sel_op
-            if st.form_submit_button("💾 Guardar Asignaciones"):
-                st.session_state.asig_unidad_operador = nueva_asig
+            u_sel = st.selectbox("Selecciona la Unidad:", options=st.session_state.lista_unidades)
+            op_actual_asig = st.session_state.asig_unidad_operador.get(u_sel, st.session_state.lista_operadores[0])
+            op_sel = st.selectbox("Operador Predeterminado:", options=st.session_state.lista_operadores, index=st.session_state.lista_operadores.index(op_actual_asig) if op_actual_asig in st.session_state.lista_operadores else 0)
+            if st.form_submit_button("🔗 Guardar Enlace"):
+                st.session_state.asig_unidad_operador[u_sel] = op_sel
                 guardar_catalogos_en_disco()
-                st.success("✅ Asignaciones guardadas con éxito.")
+                st.success("✅ Vínculo guardado.")
                 st.rerun()
 
     with tab_admin3:
-        st.markdown("### Eliminación de Catálogos")
-        tipo_del = st.selectbox("Elemento a eliminar:", ["Unidad", "Operador", "Cliente completo", "Sucursal específica"])
-        if tipo_del == "Unidad":
-            u_del = st.selectbox("Selecciona Unidad:", options=st.session_state.lista_unidades)
+        tipo_del = st.selectbox("Catálogo:", ["Unidades", "Operadores", "Clientes"])
+        if tipo_del == "Unidades":
+            u_del = st.selectbox("Unidad a eliminar:", options=st.session_state.lista_unidades)
             if st.button("🗑️ Eliminar Unidad") and len(st.session_state.lista_unidades) > 1:
                 st.session_state.lista_unidades.remove(u_del)
-                if u_del in st.session_state.asig_unidad_operador:
-                    del st.session_state.asig_unidad_operador[u_del]
                 guardar_catalogos_en_disco()
-                st.success(f"✅ Unidad {u_del} eliminada.")
                 st.rerun()
-        elif tipo_del == "Operador":
-            op_del = st.selectbox("Selecciona Operador:", options=st.session_state.lista_operadores)
+        elif tipo_del == "Operadores":
+            op_del = st.selectbox("Operador a eliminar:", options=st.session_state.lista_operadores)
             if st.button("🗑️ Eliminar Operador") and len(st.session_state.lista_operadores) > 1:
                 st.session_state.lista_operadores.remove(op_del)
                 guardar_catalogos_en_disco()
-                st.success(f"✅ Operador {op_del} eliminado.")
                 st.rerun()
-        elif tipo_del == "Cliente completo":
-            c_del = st.selectbox("Selecciona ID de Cliente:", options=st.session_state.lista_clientes)
-            if st.button("🗑️ Eliminar Cliente") and len(st.session_state.lista_clientes) > 1:
-                if c_del in st.session_state.db_clientes:
-                    del st.session_state.db_clientes[c_del]
-                if c_del in st.session_state.lista_clientes:
-                    st.session_state.lista_clientes.remove(c_del)
+        elif tipo_del == "Clientes":
+            cli_del = st.selectbox("Cliente a eliminar:", options=st.session_state.lista_clientes)
+            if st.button("🗑️ Eliminar Cliente"):
+                if cli_del in st.session_state.db_clientes: del st.session_state.db_clientes[cli_del]
+                if cli_del in st.session_state.lista_clientes: st.session_state.lista_clientes.remove(cli_del)
                 guardar_catalogos_en_disco()
-                st.success(f"✅ Cliente {c_del} eliminado.")
                 st.rerun()
-        elif tipo_del == "Sucursal específica":
-            c_sel = st.selectbox("Cliente:", options=st.session_state.lista_clientes, key="del_cli")
-            sucursales_c = list(st.session_state.db_clientes.get(c_sel, {}).keys())
-            s_sel = st.selectbox("Sucursal:", options=sucursales_c, key="del_suc")
-            if st.button("🗑️ Eliminar Sucursal") and len(sucursales_c) > 1:
-                if c_sel in st.session_state.db_clientes and s_sel in st.session_state.db_clientes[c_sel]:
-                    del st.session_state.db_clientes[c_sel][s_sel]
-                    guardar_catalogos_en_disco()
-                    st.success(f"✅ Sucursal {s_sel} eliminada.")
-                    st.rerun()
 
     with tab_admin4:
-        st.markdown("### Reportes y Descarga de Registros")
         if os.path.exists(ARCHIVO_REGISTROS):
-            with open(ARCHIVO_REGISTROS, "rb") as f:
-                st.download_button("📥 Descargar Historial de Rutas (Excel)", data=f, file_name="registros_rutas.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        else:
-            st.info("Aún no hay registros de rutas guardados.")
+            st.dataframe(pd.read_excel(ARCHIVO_REGISTROS))
 
-        if os.path.exists(ARCHIVO_CATALOGOS):
-            with open(ARCHIVO_CATALOGOS, "rb") as f:
-                st.download_button("📥 Descargar Catálogos Actuales (Excel)", data=f, file_name="catalogos_guardados.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+st.markdown("---")
+
+# ==========================================
+# ETAPA 1: SALIDA DE PATIO BASE
+# ==========================================
+if st.session_state.etapa_idx == 0:
+    st.header("Etapa 1: Salida de Patio Base")
+
+    col_u1, col_u2, col_foto = st.columns([2, 2, 1.2])
+    with col_u1:
+        idx_u = st.session_state.lista_unidades.index(st.session_state.unidad_activa) if st.session_state.unidad_activa in st.session_state.lista_unidades else 0
+        unidad_seleccionada = st.selectbox("Selecciona la Unidad:", options=st.session_state.lista_unidades, index=idx_u, key="sel_unidad_e1", on_change=al_cambiar_unidad)
+    
+    with col_u2:
+        operador_sugerido = st.session_state.asig_unidad_operador.get(unidad_seleccionada, st.session_state.lista_operadores[0])
+        st.session_state.operador_activo = operador_sugerido
+        idx_op = st.session_state.lista_operadores.index(operador_sugerido) if operador_sugerido in st.session_state.lista_operadores else 0
+        operador_seleccionado = st.selectbox("Operador Asignado:", options=st.session_state.lista_operadores, index=idx_op, key="sel_operador_e1")
+        st.session_state.operador_activo = operador_seleccionado
+
+    with col_foto:
+        st.markdown("<p style='font-size: 0.85rem; font-weight:600; margin-bottom:5px;'>Fotografía Operador:</p>", unsafe_allow_html=True)
+        op_actual = st.session_state.get("operador_activo", "")
+        nombre_limpio = "".join([c if c.isalnum() else "_" for c in op_actual])
+        foto_encontrada = None
+        if os.path.exists(CARPETA_FOTOS_OPERADORES):
+            for archivo in os.listdir(CARPETA_FOTOS_OPERADORES):
+                if archivo.startswith(nombre_limpio + "."):
+                    foto_encontrada = os.path.join(CARPETA_FOTOS_OPERADORES, archivo)
+                    break
+        tamano_f = config_actual.get("tamano_foto_operador", 120)
+        if foto_encontrada and os.path.exists(foto_encontrada):
+            try: st.image(Image.open(foto_encontrada), width=tamano_f)
+            except: st.info("Sin foto")
+        else:
+            st.markdown(f'<div style="width: {tamano_f}px; height: {tamano_f}px; background-color: #f0f2f6; border: 2px dashed #ccc; border-radius: 8px; display: flex; align-items: center; justify-content: center;"><span style="font-size: 0.75rem; color: #666;">Sin foto</span></div>', unsafe_allow_html=True)
+
+    st.info(f"🚚 Unidad Activa: **{st.session_state.unidad_activa}** | 👤 Operador: **{st.session_state.operador_activo}**")
+
+    st.subheader("Kilometraje y Hora de Salida")
+    col_km1, col_hr1 = st.columns([2, 2])
+    with col_km1:
+        st.session_state.km_salida_patio = st.number_input("Kilometraje Salida Patio:", min_value=0.0, max_value=999999.0, value=float(st.session_state.get("km_salida_patio", 145826.0)), step=1.0, key="input_km_salida_patio")
+    with col_hr1:
+        if not st.session_state.get("hora_salida_patio"):
+            st.session_state.hora_salida_patio = obtener_hora_mexico()
+        st.text_input("Hora Salida Patio:", value=st.session_state.hora_salida_patio, disabled=True, key="input_hora_salida_patio")
+
+    if st.button("🚀 Registrar Salida y Continuar a Pedrera", type="primary"):
+        st.session_state.etapa_idx = 1
+        guardar_borrador_de_disco()
+        st.rerun()
+
+# ==========================================
+# ETAPA INTERMEDIA: PEDRERA
+# ==========================================
+elif st.session_state.etapa_idx == 1:
+    st.header("Etapa Intermedia: Pedrera (Llegada / Salida)")
+    st.markdown(f"🚚 Unidad: **{st.session_state.unidad_activa}** | 👤 Operador: **{st.session_state.operador_activo}**")
+    
+    col_p1, col_p2 = st.columns(2)
+    with col_p1:
+        st.subheader("Llegada a Pedrera")
+        st.session_state.km_llegada_pedrera = st.number_input("Km Llegada Pedrera:", min_value=0.0, value=float(st.session_state.get("km_llegada_pedrera", st.session_state.km_salida_patio)), key="in_km_lle_ped")
+        if not st.session_state.get("hora_llegada_pedrera"): st.session_state.hora_llegada_pedrera = obtener_hora_mexico()
+        st.text_input("Hora Llegada Pedrera:", value=st.session_state.hora_llegada_pedrera, disabled=True, key="in_hr_lle_ped")
+        if st.button("📍 Registrar Llegada Pedrera"):
+            st.session_state.hora_llegada_pedrera = obtener_hora_mexico()
+            guardar_borrador_de_disco()
+            st.success("✅ Llegada registrada.")
+
+    with col_p2:
+        st.subheader("Salida de Pedrera (Cargado)")
+        st.session_state.km_salida_pedrera = st.number_input("Km Salida Pedrera:", min_value=0.0, value=float(st.session_state.get("km_salida_pedrera", st.session_state.km_llegada_pedrera)), key="in_km_sal_ped")
+        if not st.session_state.get("hora_salida_pedrera"): st.session_state.hora_salida_pedrera = obtener_hora_mexico()
+        st.text_input("Hora Salida Pedrera:", value=st.session_state.hora_salida_pedrera, disabled=True, key="in_hr_sal_ped")
+        if st.button("📍 Registrar Salida Pedrera"):
+            st.session_state.hora_salida_pedrera = obtener_hora_mexico()
+            guardar_borrador_de_disco()
+            st.success("✅ Salida registrada.")
+
+    col_nav_p1, col_nav_p2 = st.columns(2)
+    with col_nav_p1:
+        if st.button("⬅️ Volver a Etapa 1"):
+            st.session_state.etapa_idx = 0
+            guardar_borrador_de_disco()
+            st.rerun()
+    with col_nav_p2:
+        if st.button("➡️ Continuar a Etapa Cliente", type="primary"):
+            st.session_state.etapa_idx = 2
+            guardar_borrador_de_disco()
+            st.rerun()
+
+# ==========================================
+# ETAPA 2: LLEGADA / SALIDA CLIENTE
+# ==========================================
+elif st.session_state.etapa_idx == 2:
+    st.header("Etapa 2: Llegada / Salida Cliente")
+    
+    col_c1, col_c2 = st.columns(2)
+    with col_c1:
+        idx_cli = st.session_state.lista_clientes.index(st.session_state.get("sel_cliente_e2", st.session_state.lista_clientes[0])) if st.session_state.get("sel_cliente_e2") in st.session_state.lista_clientes else 0
+        st.selectbox("Selecciona Número de Cliente:", options=st.session_state.lista_clientes, index=idx_cli, key="sel_cliente_e2", on_change=al_cambiar_cliente_e2)
+    
+    with col_c2:
+        cliente_key_limpio = str(st.session_state.sel_cliente_e2).strip().replace(".0", "")
+        sucursales_disponibles = list(st.session_state.db_clientes.get(cliente_key_limpio, {"Principal": {}}).keys())
+        if st.session_state.get("sel_sucursal_e2") not in sucursales_disponibles:
+            st.session_state.sel_sucursal_e2 = sucursales_disponibles[0]
+        
+        idx_suc = sucursales_disponibles.index(st.session_state.sel_sucursal_e2) if st.session_state.sel_sucursal_e2 in sucursales_disponibles else 0
+        st.selectbox("Selecciona Sucursal / Obra:", options=sucursales_disponibles, index=idx_suc, key="sel_sucursal_e2", on_change=al_cambiar_sucursal_e2)
+
+    actualizar_datos_cliente()
+
+    contacto_texto = st.session_state.cli_contacto if st.session_state.cli_contacto and str(st.session_state.cli_contacto).lower() != 'nan' else "N/D"
+    telefono_texto = st.session_state.cli_telefono if st.session_state.cli_telefono and str(st.session_state.cli_telefono).lower() != 'nan' else "N/D"
+    
+    # Generar link dinámico de Google Maps con las coordenadas actuales
+    link_gmaps = f"https://www.google.com/maps/search/?api=1&query={st.session_state.cli_latitud},{st.session_state.cli_longitud}"
+
+    st.markdown(f"""
+        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6; margin-bottom: 20px;">
+            <p style="margin: 0 0 8px 0;"><b>🏢 Cliente ID:</b> {cliente_key_limpio} - <b>Sucursal:</b> {st.session_state.sel_sucursal_e2}</p>
+            <p style="margin: 0 0 8px 0;"><b>👤 Contacto:</b> {contacto_texto} | 📞 <b>Teléfono:</b> {telefono_texto}</p>
+            <p style="margin: 0 0 12px 0;"><b>📍 Coordenadas:</b> Lat: {st.session_state.cli_latitud}, Lon: {st.session_state.cli_longitud}</p>
+            <a href="{link_gmaps}" target="_blank" style="display: inline-block; background-color: #1a73e8; color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-weight: 600; font-size: 0.9rem;">🗺️ Abrir ubicación en Google Maps</a>
+        </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    col_cli_l, col_cli_s = st.columns(2)
+    with col_cli_l:
+        st.subheader("Llegada con Cliente")
+        st.session_state.km_llegada_cliente = st.number_input("Km Llegada Cliente:", min_value=0.0, value=float(st.session_state.get("km_llegada_cliente", st.session_state.km_salida_pedrera)), key="in_km_lle_cli")
+        if not st.session_state.get("hora_llegada_cliente"): st.session_state.hora_llegada_cliente = obtener_hora_mexico()
+        st.text_input("Hora Llegada Cliente:", value=st.session_state.hora_llegada_cliente, disabled=True, key="in_hr_lle_cli")
+        if st.button("📍 Registrar Llegada Cliente"):
+            st.session_state.hora_llegada_cliente = obtener_hora_mexico()
+            guardar_borrador_de_disco()
+            st.success("✅ Llegada registrada.")
+
+    with col_cli_s:
+        st.subheader("Salida de Cliente (Descargado)")
+        st.session_state.km_salida_cliente = st.number_input("Km Salida Cliente:", min_value=0.0, value=float(st.session_state.get("km_salida_cliente", st.session_state.km_llegada_cliente)), key="in_km_sal_cli")
+        if not st.session_state.get("hora_salida_cliente"): st.session_state.hora_salida_cliente = obtener_hora_mexico()
+        st.text_input("Hora Salida Cliente:", value=st.session_state.hora_salida_cliente, disabled=True, key="in_hr_sal_cli")
+        if st.button("📍 Registrar Salida Cliente"):
+            st.session_state.hora_salida_cliente = obtener_hora_mexico()
+            guardar_borrador_de_disco()
+            st.success("✅ Salida registrada.")
+
+    col_nav_c1, col_nav_c2 = st.columns(2)
+    with col_nav_c1:
+        if st.button("⬅️ Volver a Pedrera"):
+            st.session_state.etapa_idx = 1
+            guardar_borrador_de_disco()
+            st.rerun()
+    with col_nav_c2:
+        if st.button("➡️ Continuar a Cierre de Ruta", type="primary"):
+            st.session_state.etapa_idx = 3
+            guardar_borrador_de_disco()
+            st.rerun()
+
+# ==========================================
+# ETAPA 3: CIERRE DE RUTA / REGRESO
+# ==========================================
+elif st.session_state.etapa_idx == 3:
+    st.header("Etapa 3: Cierre de Ruta / Regreso a Patio")
+    st.session_state.km_final_viaje = st.number_input("Kilometraje Final (Llegada a Patio Base):", min_value=0.0, value=float(st.session_state.get("km_final_viaje", st.session_state.km_salida_cliente)), key="in_km_final")
+    if not st.session_state.get("hora_cierre_viaje"): st.session_state.hora_cierre_viaje = obtener_hora_mexico()
+    st.text_input("Hora de Cierre de Ruta:", value=st.session_state.hora_cierre_viaje, disabled=True, key="in_hr_final")
+
+    km_totales = st.session_state.km_final_viaje - st.session_state.km_salida_patio
+    st.info(f"📊 **Resumen del Viaje:** {km_totales:.2f} Kilómetros recorridos totales.")
+
+    col_fin1, col_fin2 = st.columns(2)
+    with col_fin1:
+        if st.button("⬅️ Volver a Etapa Cliente"):
+            st.session_state.etapa_idx = 2
+            guardar_borrador_de_disco()
+            st.rerun()
+    with col_fin2:
+        if st.button("💾 Guardar y Finalizar Ruta Oficial", type="primary"):
+            registro_completo = {
+                "Fecha": obtener_hora_mexico().split()[0], "Unidad": st.session_state.unidad_activa, "Operador": st.session_state.operador_activo,
+                "Km Salida Patio": st.session_state.km_salida_patio, "Hora Salida Patio": st.session_state.hora_salida_patio,
+                "Km Llegada Pedrera": st.session_state.km_llegada_pedrera, "Hora Llegada Pedrera": st.session_state.hora_llegada_pedrera,
+                "Km Salida Pedrera": st.session_state.km_salida_pedrera, "Hora Salida Pedrera": st.session_state.hora_salida_pedrera,
+                "Km Llegada Cliente": st.session_state.km_llegada_cliente, "Hora Llegada Cliente": st.session_state.hora_llegada_cliente,
+                "Km Salida Cliente": st.session_state.km_salida_cliente, "Hora Salida Cliente": st.session_state.hora_salida_cliente,
+                "Km Final Patio": st.session_state.km_final_viaje, "Hora Cierre Ruta": st.session_state.hora_cierre_viaje, "Km Totales": km_totales
+            }
+            guardar_en_excel(registro_completo)
+            if os.path.exists(ARCHIVO_BORRADOR):
+                try: os.remove(ARCHIVO_BORRADOR)
+                except: pass
+            st.success("🎉 ¡Ruta guardada exitosamente en el historial del sistema!")
+            st.balloons()
